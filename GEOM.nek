@@ -1,20 +1,14 @@
 C
 C     Geometry arrays
 C
-      integer*8 rpxm1, rpym1, rpzm1
-      pointer (rpxm1, xm1(lx1, ly1, lz1, lelt))
-      pointer (rpym1, ym1(lx1, ly1, lz1, lelt))
-      pointer (rpzm1, zm1(lx1, ly1, lz1, lelt))
-
       COMMON /GXYZ/
-     $ 	     rpxm1, rpym1, rpzm1,
-c     $              XM1   (LX1,LY1,LZ1,LELT)
-c     $             ,YM1   (LX1,LY1,LZ1,LELT)
-c     $             ,ZM1   (LX1,LY1,LZ1,LELT)
-     $             XM2   (LX2,LY2,LZ2,LELV)
+     $              XM1   (LX1,LY1,LZ1,LELT)
+     $             ,YM1   (LX1,LY1,LZ1,LELT)
+     $             ,ZM1   (LX1,LY1,LZ1,LELT)
+     $             ,XM2   (LX2,LY2,LZ2,LELV)
      $             ,YM2   (LX2,LY2,LZ2,LELV)
      $             ,ZM2   (LX2,LY2,LZ2,LELV)
-
+C
       COMMON /GISO1/
      $              RXM1  (LX1,LY1,LZ1,LELT)
      $             ,SXM1  (LX1,LY1,LZ1,LELT)

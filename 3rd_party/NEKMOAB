@@ -1,16 +1,22 @@
 c Data common to functions in moab.f. Do #include instead of include or 
 c it won't work (because we're using preproc macros here)
 
-      IMESH_HANDLE imesh
+#include "iMesh_f.h"
 
-      IMESH_HANDLE hexHandles(*)
+      include 'SIZE'
+      include 'GEOM'
+      include 'SOLN'
+      include 'SCRCG'
+
+      integer*4 hexSize
+
+      integer*8 imeshh, rootset, globalIdTag, hexHandlesPointer
+
+      common /nekmoab/ imeshh, rootset, globalIdTag, hexHandlesPointer, 
+     1	     hexSize
+
+      integer*8 hexHandles(*)
       pointer (hexHandlesPointer, hexHandles)
-
-      integer hexSize
-
-      IMESH_HANDLE globalIdTag
-
-      common /nekmoab/ imesh, globalIdTag, hexHandlesPointer, hexSize
 
       integer TWENTYSEVEN
       parameter (TWENTYSEVEN = 27)

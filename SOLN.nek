@@ -17,11 +17,6 @@ C     Solution and data
 C
       COMMON /BQCB/    BQ     (LX1,LY1,LZ1,LELT,LDIMT)
 
-      pointer (rpvx, vx(lx1, ly1, lz1, *))
-      pointer (rpvy, vy(lx1, ly1, lz1, *))
-      pointer (rpvz, vz(lx1, ly1, lz1, *))
-      pointer (rpt, t(lx1, ly1, lz1, lelt, *))
-
       COMMON /VPTSOL/  
 c     Can be used for post-processing runs (SIZE .gt. 10+3*LDIMT flds)
      $                 VXLAG  (LX1,LY1,LZ1,LELV,2)
@@ -37,12 +32,10 @@ c     Can be used for post-processing runs (SIZE .gt. 10+3*LDIMT flds)
      $               , ABY2   (LX1,LY1,LZ1,LELV)
      $               , ABZ2   (LX1,LY1,LZ1,LELV)
      $               , VDIFF_E(LX1,LY1,LZ1,LELT)
-c     Solution data
-     $	       ,rpvx, rpvy, rpvz, rpt
-c     $               , VX     (LX1,LY1,LZ1,LELV)
-c     $               , VY     (LX1,LY1,LZ1,LELV)
-c     $               , VZ     (LX1,LY1,LZ1,LELV)
-c     $               , T      (LX1,LY1,LZ1,LELT,LDIMT)
+     $               , VX     (LX1,LY1,LZ1,LELV)
+     $               , VY     (LX1,LY1,LZ1,LELV)
+     $               , VZ     (LX1,LY1,LZ1,LELV)
+     $               , T      (LX1,LY1,LZ1,LELT,LDIMT)
      $               , VTRANS (LX1,LY1,LZ1,LELT,LDIMT1)
      $               , VDIFF  (LX1,LY1,LZ1,LELT,LDIMT1)
      $               , BFX    (LX1,LY1,LZ1,LELV)

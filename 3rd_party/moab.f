@@ -5,11 +5,12 @@
 #endif
 
 #define IMESH_NULL 0
-#define IMESH_ASSERT(ierr, imesh) if (ierr .ne. 0) call imesh_err(ierr, imesh, 0,__LINE__)
+#define IMESH_ASSERT \
+      if (ierr.ne.0) call imesh_err(ierr,imeshh,'moab.f ',__LINE__)
+
 #define IMESH_NULLSTRIP(s) s(:index(s, char(0))-1)
 
 #define MYLOC LOC
-#define MYVAL %val
 
 
 c    We are targeting hex27 meshes coming from MOAB.
@@ -25,9 +26,8 @@ c    * conj. heat transfer
 c    * periodic BCs
 c-----------------------------------------------------------------------
       subroutine moab_dat
-      include 'SIZE'
-      include 'TOTAL'
-
+#include "NEKMOAB"
+      include 'PARALLEL'
       common /mbc/ moabbc(6,lelt) 
       integer moabbc
 
@@ -39,13 +39,15 @@ c-----------------------------------------------------------------------
 
       call chk_nel
 
+      call nekMOAB_assign_tag_storage             ! set Nek variables to point to MOAB storage
+
       call mapelpr                        ! create gllel mapping 
       call moab_geometry(xm1,ym1,zm1)     ! fill xm1,ym1,zm1
       call xml2xc                         ! fill xc,yc,zc
 
       call ifill(moabbc, 0, 6*lelt)
       call nekMOAB_BC(moabbc)             ! read MOAB BCs 
-
+      
 c      call nekMOAB_loadMaterialSets
 
 #if 0
@@ -60,18 +62,94 @@ c      call nekMOAB_loadMaterialSets
       return
       end
 c-----------------------------------------------------------------------
+      subroutine nekMOAB_assign_tag_storage
+c
+#include "NEKMOAB"
+
+      integer num_hexes, ierr
+      iBase_EntityHandle iter
+      IBASE_HANDLE_T tagh
+      integer semdim(3)
+
+c get the number of regions/hexes in the local mesh (need that to init the iterator)
+      call iMesh_getNumOfType(%VAL(imeshh), %VAL(rootset), 
+     1 %VAL(iBase_REGION), num_regions, ierr)
+      IMESH_ASSERT
+
+c get an iterator over regions
+      call iMesh_initEntArrIter(%VAL(imeshh), %VAL(rootset), 
+     1 %VAL(iBase_REGION), %VAL(iMesh_HEXAHEDRON),%VAL(num_hexes),
+     1 %VAL(0), iter, ierr) 
+      IMESH_ASSERT
+
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "SEM_X", rpxm1)
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "SEM_Y", rpym1)
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "SEM_Z", rpzm1)
+
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "VEL_X", rpvx)
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "VEL_Y", rpvy)
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "VEL_Z", rpvz)
+
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "TEMP", rpt)
+
+      call nekMOAB_get_tag_storage(lx1*ly1*lz1, iter, "PRESS", rpp1)
+      rpp2 = rpp1 + lx1*ly1*lz1*lelt
+      rpp3 = rpp1 + lelt + 1
+      rpp4 = rpp3 + lelt + 1
+
+c get rid of the iterator, since we no longer need it
+      call iMesh_endEntArrIter(%VAL(imeshh), %VAL(iter), ierr)
+      IMESH_ASSERT
+
+c create a tag to store SEM dimensions, and set it on the root set
+      semdim(1) = lx1
+      semdim(2) = ly1
+      semdim(3) = lz1
+      call iMesh_createTagWithOptions(%VAL(imeshh), "SEM_DIMS", 
+     1     "moab:TAG_STORAGE_TYPE=SPARSE", 
+     1     %VAL(3), %VAL(iBase_INTEGER), tagh, ierr)
+      IMESH_ASSERT
+      call iMesh_setEntSetData(%VAL(imeshh), %VAL(rootset), %VAL(tagh), 
+     1     semdim, 12, ierr)
+      IMESH_ASSERT
+
+      return
+      end
+c-----------------------------------------------------------------------
+      subroutine nekMOAB_get_tag_storage(isz, iter, tag_name, rpdata) 
+c
+#include "NEKMOAB"
+
+      iBase_EntityHandle iter
+      character*(*) tag_name
+      integer*8 rpdata
+      integer*4 isz
+
+      integer ierr, count
+      IBASE_HANDLE_T tagh
+
+c create the tag
+      call iMesh_createTagWithOptions(%VAL(imeshh), tag_name, 
+     1 "moab:TAG_STORAGE_TYPE=DENSE moab:TAG_DEFAULT_VALUE=0.0", 
+     1 %VAL(isz), %VAL(iBase_DOUBLE), tagh, ierr)
+      IMESH_ASSERT
+
+c iterate over tag memory
+      call iMesh_tagIterate(%VAL(imeshh), %VAL(tagh), %VAL(iter), 
+     1     rpdata, count, ierr)
+      IMESH_ASSERT
+
+      return
+      end
+      
+c-----------------------------------------------------------------------
       subroutine nekMOAB_load
 c
 c     Load "filename" into imesh/moab, store imesh handle 
 c     in /nekmoab/ common block
 c
-      implicit none
-#include "iMesh_f.h"
 #include "NEKMOAB"
-
-      character*(*) filename
-      parameter(filename='input.h5m')
-
+      include 'INPUT'
       character*(*) loadOpt
 c     ! only root processor will read and broadcast
 c      parameter(loadOpt=";PARALLEL=READ_PART;PARTITION=PARALLEL_PARTIT
@@ -79,24 +157,22 @@ c     $ION;PARTITION_DISTRIBUTE;")
       ! all processor will read the input file and delete what is not needed
       parameter(loadOpt="moab:PARALLEL=READ_PART  moab:PARTITION=PARALLE
      $L_PARTITION moab:PARALLEL_RESOLVE_SHARED_ENTS")
-
       character*(*) loadMode
       parameter(loadMode="PARALLEL")
 
       integer ierr
-      IMESH_HANDLE rootst
 
-      !Initialize imesh and load file
-      imesh = IMESH_NULL
-      call iMesh_newMesh(loadMode, imesh, ierr)
-      IMESH_ASSERT(ierr, imesh)
+c      !Initialize imesh and load file
+      imeshh = IMESH_NULL
+      call iMesh_newMesh(loadMode, imeshh, ierr)
+      IMESH_ASSERT
 
-      call iMesh_getRootSet(MYVAL(imesh), rootst, ierr)
+      call iMesh_getRootSet(%VAL(imeshh), rootset, ierr)
 
-      call iMesh_load(MYVAL(imesh), MYVAL(rootst), filename, 
+      call iMesh_load(%VAL(imeshh), %VAL(rootset), H5MFLE, 
      $     loadOpt,
      $     ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
       end  
 c-----------------------------------------------------------------------
@@ -114,36 +190,33 @@ c     that if A has a lower global element number than B, it also
 c     has a lower local element number. 
 c     Who knows if this will be true with data coming from imesh.
 c
-      include 'SIZE'
+#include "NEKMOAB"
       include 'INPUT'
       include 'PARALLEL'
-      include 'SOLN'
       include 'SCRCT'
       include 'ZPER'
 
       include 'mpif.h'
 
-#include "iMesh_f.h"
-#include "NEKMOAB"
 
       integer globalId, lastGlobalId
 
-      call iMesh_getTagHandle(MYVAL(imesh),
+      call iMesh_getTagHandle(%VAL(imeshh),
      $     "GLOBAL_ID", !/*in*/ const char* tag_name,
      $     globalIdTag, !/*out*/ iBase_TagHandle *tag_handle, 
      $     ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
       
       ifooAlloc = 0
       hexHandlesPointer = IMESH_NULL
       hexSize = 0
-      call iMesh_getEntities(MYVAL(imesh), 
-     $     MYVAL(IMESH_NULL), 
-     $     MYVAL(iBase_REGION), 
-     $     MYVAL(iMesh_ALL_TOPOLOGIES), 
+      call iMesh_getEntities(%VAL(imeshh), 
+     $     %VAL(rootset), 
+     $     %VAL(iBase_REGION), 
+     $     %VAL(iMesh_ALL_TOPOLOGIES), 
      $     hexHandlesPointer, ifooAlloc, hexSize, ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
 c      nelgv = hexSize
       nelv = hexSize
@@ -163,20 +236,21 @@ c      nelgv = hexSize
       call izero(GLLNID, NELGV)
       lastGlobalId = -1
       do i=1, hexSize
-         call iMesh_getIntData(MYVAL(imesh), !iMesh_Instance instance,
-     $        MYVAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $        MYVAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
+         call iMesh_getIntData(%VAL(imeshh), !iMesh_Instance instance,
+     $        %VAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $        %VAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
      $        globalId,
      $        ierr) 
-         IMESH_ASSERT(ierr, imesh)
+         IMESH_ASSERT
 c         print *, nid, 'local hex ', i, 'has global_id ', globalId
 
          !consistency check
-         if(globalId .lt. lastGlobalId) then
-            print *, "bug! this won't work"
-            call exitt
+         if(globalId .lt. lastGlobalId .or. globalId .eq. 0) then
+            print *, 'WARNING: non-monotonic hex global id: proc ', nid,
+     $           'hex ', i, 'has global id ', globalId
+         else
+            lastGlobalId = globalId
          endif
-         lastGlobalId = globalId
 
          if(globalId .gt. nelgv) then 
            write(6,*) 'ABORT: invalid  globalId! ', globalId
@@ -190,22 +264,18 @@ c         print *, nid, 'local hex ', i, 'has global_id ', globalId
       return
       end 
 c-----------------------------------------------------------------------
-      subroutine nekMOAB_matSet2(matl, lelt, setHandle, setId)
+      subroutine nekMOAB_matSet2(matl, setHandle, setId)
 c
 c     Internal function, don't call directly
 c
-      implicit none
-
-#include "iMesh_f.h"
 #include "NEKMOAB"
 
-      integer lelt
       integer matl(1)
 
-      IMESH_HANDLE setHandle
+      IBASE_HANDLE_T setHandle
       integer setId !coming from cubit
 
-      IMESH_HANDLE hexes(*)
+      IBASE_HANDLE_T hexes(*)
       pointer (hexesPointer, hexes)
       integer hexesSize, hexesAlloc
       integer ierr, i, elno
@@ -214,13 +284,13 @@ c
       !what hexes are in this set?
       hexesAlloc = 0
       hexesPointer = IMESH_NULL
-      call iMesh_getEntitiesRec(MYVAL(imesh), 
-     $     MYVAL(setHandle), 
-     $     MYVAL(iBase_REGION), 
-     $     MYVAL(iMesh_HEXAHEDRON),
-     $     MYVAL(1),
+      call iMesh_getEntitiesRec(%VAL(imeshh), 
+     $     %VAL(setHandle), 
+     $     %VAL(iBase_REGION), 
+     $     %VAL(iMesh_HEXAHEDRON),
+     $     %VAL(1),
      $     hexesPointer, hexesAlloc, hexesSize, ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
       do i=1, hexesSize
          call nekMOAB_getElNo(hexes(i), elno)
@@ -232,7 +302,7 @@ c
       return
       end 
 c-----------------------------------------------------------------------
-      subroutine nekMOAB_loadConn(vertex, nelgt, nelt, ncrnr)
+      subroutine nekMOAB_loadConn(vertex, nelgt, ncrnr)
 c
 c     Fill the vertex array with connectivity data from imesh
 c
@@ -240,15 +310,12 @@ c     vertex(ncrnr, nelgt): int array, global id of a vertex
 c     nelgt: int, global number of elements
 c     ncrnr: int, number of corner vertices per element (should be 8)
 c
-      implicit none
 
-#include "iMesh_f.h"
 #include "NEKMOAB"
 
       integer nelgt, ncrnr
       integer vertex(ncrnr, 1)
 
-      integer nelt
       integer globalId, ierr,i,k,m,n,npass,lex,ivmin,ivmax,iglmin,iglmax
 
       integer vtxId(TWENTYSEVEN)
@@ -256,10 +323,10 @@ c
       integer vtxIdSize, vtxIdAlloc
       integer vtxIdData(TWENTYSEVEN)
 
-      IMESH_HANDLE vtxHandles(TWENTYSEVEN)
+      IBASE_HANDLE_T vtxHandles(TWENTYSEVEN)
       pointer (vtxHandlesPointer, vtxHandles)
       integer vtxHandlesSize, vtxHandlesAlloc
-      IMESH_HANDLE vtxHandlesData(TWENTYSEVEN)
+      IBASE_HANDLE_T vtxHandlesData(TWENTYSEVEN)
 
       integer l2c(27),j
       common /cccc/ l2c
@@ -276,26 +343,26 @@ c      write(6,*) hexSize,nelt,nelgt,ncrnr
       call izero(vertex, nelt*ncrnr)
 
       do i=1, hexSize
-        call iMesh_getIntData(MYVAL(imesh), !iMesh_Instance instance,
-     $        MYVAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $        MYVAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
+        call iMesh_getIntData(%VAL(imeshh), !iMesh_Instance instance,
+     $        %VAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $        %VAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
      $        globalId,       !/*out*/ int *out_data,
      $        ierr)             !/*out*/ int *err);
-         IMESH_ASSERT(ierr, imesh)
+         IMESH_ASSERT
          
-         call iMesh_getEntAdj(MYVAL(imesh), 
-     $         MYVAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $         MYVAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
+         call iMesh_getEntAdj(%VAL(imeshh), 
+     $         %VAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $         %VAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
      $         vtxHandlesPointer, !/*inout*/ iBase_EntityHandle** adj_entity_handles,
      $         vtxHandlesAlloc, !/*inout*/ int* adj_entity_handles_allocated,
      $         vtxHandlesSize , !/*out*/ int* adj_entity_handles_size,
      $         ierr)
-         IMESH_ASSERT(ierr, imesh)
+         IMESH_ASSERT
 
-         call iMesh_getIntArrData(MYVAL(imesh), !iMesh_Instance instance,
-     $         MYVAL(vtxHandlesPointer), !/*in*/ const iBase_EntityHandle* entity_handles
-     $         MYVAL(vtxHandlesSize), !/*in*/ const int entity_handles_size,
-     $         MYVAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
+         call iMesh_getIntArrData(%VAL(imeshh), !iMesh_Instance instance,
+     $         %VAL(vtxHandlesPointer), !/*in*/ const iBase_EntityHandle* entity_handles
+     $         %VAL(vtxHandlesSize), !/*in*/ const int entity_handles_size,
+     $         %VAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
      $         vtxIdPointer, !/*inout*/ int** tag_values,
      $         vtxIdAlloc, !/*inout*/ int* tag_values_allocated,
      $         vtxIdSize, !/*out*/ int* tag_values_size,
@@ -318,16 +385,14 @@ c
 c     stuff the xyz coords of the 27 verts of each local element -- 
 c     shared vertex coords are stored redundantly
 c
-      implicit none
 
-#include "iMesh_f.h"
 #include "NEKMOAB"
       real x27(27,1), y27(27,1), z27(27,1)
 
-      IMESH_HANDLE vtxHandles(TWENTYSEVEN)
+      IBASE_HANDLE_T vtxHandles(TWENTYSEVEN)
       pointer (vtxHandlesPointer, vtxHandles)
       integer vtxHandlesSize, vtxHandlesAlloc
-      IMESH_HANDLE vtxHandlesData(TWENTYSEVEN)
+      IBASE_HANDLE_T vtxHandlesData(TWENTYSEVEN)
 
       integer i, j, ierr
 
@@ -335,14 +400,14 @@ c
       vtxHandlesAlloc = TWENTYSEVEN
 
       do i=1, hexSize         
-         call iMesh_getEntAdj(MYVAL(imesh), 
-     $                        MYVAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $                        MYVAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
+         call iMesh_getEntAdj(%VAL(imeshh), 
+     $                        %VAL(hexHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $                        %VAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
      $                        vtxHandlesPointer, !/*inout*/ iBase_EntityHandle** adj_entity_handles,
      $                        vtxHandlesAlloc, !/*inout*/ int* adj_entity_handles_allocated,
      $                        vtxHandlesSize , !/*out*/ int* adj_entity_handles_size,
      $                        ierr)
-         IMESH_ASSERT(ierr, imesh)
+         IMESH_ASSERT
          
          if(vtxHandlesSize .ne. TWENTYSEVEN) then
             print *, 'Bad mesh! Element with', vtxHandlesSize, ' nodes'
@@ -350,11 +415,11 @@ c
          endif
 
          do j=1, TWENTYSEVEN
-            call iMesh_getVtxCoord(MYVAL(imesh),
-     $                             MYVAL(vtxHandles(j)), !/*in*/ const iBase_EntityHandle vertex_handle,
+            call iMesh_getVtxCoord(%VAL(imeshh),
+     $                             %VAL(vtxHandles(j)), !/*in*/ const iBase_EntityHandle vertex_handle,
      $                             x27(j,i), y27(j,i), z27(j,i), !/*out*/ double *x, /*out*/ double *y, /*out*/ double *z,
      $                             ierr)
-            IMESH_ASSERT(ierr, imesh)
+            IMESH_ASSERT
          enddo
 
 c         print *, i, 'coords: ' 
@@ -370,46 +435,44 @@ c-----------------------------------------------------------------------------
 c
 c     Copy the boundary condition information into bcdata array
 c
-      implicit none
 
-#include "iMesh_f.h"
 #include "NEKMOAB"
 
       integer moabbc(6,1)
 
-      IMESH_HANDLE entSetHandles(*)
+      IBASE_HANDLE_T entSetHandles(*)
       pointer (entSetHandlesPointer, entSetHandles)
       integer entSetAllocated, entSetSize
 
-      IMESH_HANDLE neuSetTag
+      IBASE_HANDLE_T neuSetTag
       integer ierr, i, tagIntData
 
 
       !Sidesets in cubit come in as entity sets with the NEUMANN_SET -- see sample file
-      call iMesh_getTagHandle(MYVAL(imesh),
+      call iMesh_getTagHandle(%VAL(imeshh),
      $     "NEUMANN_SET", !/*in*/ const char* tag_name,
      $     neuSetTag, !/*out*/ iBase_TagHandle *tag_handle, 
      $     ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
 
       entSetHandlesPointer = IMESH_NULL
       entSetAllocated      = 0
-      call iMesh_getEntSets(MYVAL(imesh),
-     $     MYVAL(IMESH_NULL),     !/*in*/ const iBase_EntitySetHandle entity_set_handle,
-     $     MYVAL(1),              !/*in*/ const int num_hops,
+      call iMesh_getEntSets(%VAL(imeshh),
+     $     %VAL(rootset),     !/*in*/ const iBase_EntitySetHandle entity_set_handle,
+     $     %VAL(1),              !/*in*/ const int num_hops,
      $     entSetHandlesPointer, !/*out*/ iBase_EntitySetHandle** contained_set_handles,
      $     entSetAllocated,      !/*out*/ int* contained_set_handles_allocated,
      $     entSetSize,           !/*out*/ int* contained_set_handles_size,
      $     ierr)                 !/*out*/ int *err);
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
       !print *, 'H3', entSetSize
 
       do i=1, entSetSize
-         call iMesh_getIntData(MYVAL(imesh), !iMesh_Instance instance,
-     $        MYVAL(entSetHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $        MYVAL(neuSetTag), !/*in*/ const iBase_TagHandle tag_handle,
+         call iMesh_getIntData(%VAL(imeshh), !iMesh_Instance instance,
+     $        %VAL(entSetHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $        %VAL(neuSetTag), !/*in*/ const iBase_TagHandle tag_handle,
      $        tagIntData,       !/*out*/ int *out_data,
      $        ierr)             !/*out*/ int *err);
 
@@ -428,29 +491,27 @@ c-----------------------------------------------------------------------
 c
 c     Internal function, don't call directly
 c
-      implicit none
 
-#include "iMesh_f.h"
 #include "NEKMOAB"
 
       integer bcdata(6,1)
 
-      IMESH_HANDLE setHandle
+      IBASE_HANDLE_T setHandle
       integer setId !coming from cubit
 
-      IMESH_HANDLE faces(*)
+      IBASE_HANDLE_T faces(*)
       pointer (facesPointer, faces)
       integer facesSize, facesAlloc
 
-      IMESH_HANDLE ahex(*)
+      IBASE_HANDLE_T ahex(*)
       pointer (ahexPointer, ahex)
       integer ahexSize, ahexAlloc
 
-      IMESH_HANDLE fvtx(*)
+      IBASE_HANDLE_T fvtx(*)
       pointer (fvtxPointer, fvtx)
       integer fvtxSize, fvtxAlloc
 
-      IMESH_HANDLE hvtx(*)
+      IBASE_HANDLE_T hvtx(*)
       pointer (hvtxPointer, hvtx)
       integer hvtxSize, hvtxAlloc
 
@@ -459,68 +520,68 @@ c
       integer side_no, side_offset, side_sense
       integer hexMBCNType
 
-      call iMesh_MBCNType(MYVAL(iMesh_HEXAHEDRON), hexMBCNType)
+      call iMesh_MBCNType(%VAL(iMesh_HEXAHEDRON), hexMBCNType)
 
       !what faces are in this set?
       facesAlloc = 0
       facesPointer = IMESH_NULL
-      call iMesh_getEntitiesRec(MYVAL(imesh), 
-     $     MYVAL(setHandle), 
-     $     MYVAL(iBase_FACE), 
-     $     MYVAL(iMesh_QUADRILATERAL),
-     $     MYVAL(1),
+      call iMesh_getEntitiesRec(%VAL(imeshh), 
+     $     %VAL(setHandle), 
+     $     %VAL(iBase_FACE), 
+     $     %VAL(iMesh_QUADRILATERAL),
+     $     %VAL(1),
      $     facesPointer, facesAlloc, facesSize, ierr)
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
 
       do i=1, facesSize
          !get vertices defining the face
          fvtxAlloc = 0
          fvtxPointer = IMESH_NULL
-         call iMesh_getEntAdj(MYVAL(imesh),
-     $                        MYVAL(faces(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $                        MYVAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
+         call iMesh_getEntAdj(%VAL(imeshh),
+     $                        %VAL(faces(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $                        %VAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
      $                        fvtxPointer, !/*inout*/ iBase_EntityHandle** adj_entity_handles,
      $                        fvtxAlloc, !/*inout*/ int* adj_entity_handles_allocated,
      $                        fvtxSize , !/*out*/ int* adj_entity_handles_size,
      $                        ierr)
-         IMESH_ASSERT(ierr, imesh)         
+         IMESH_ASSERT         
 
          !get hexes adjacent to the face (1 or 2) 
          ! -- hopefully only returns hexes on local proc, but untested
          ahexAlloc = 0
          ahexPointer = IMESH_NULL                  
-         call iMesh_getEntAdj(MYVAL(imesh), 
-     $                        MYVAL(faces(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $                        MYVAL(iBase_REGION), !/*in*/ const int entity_type_requested,
+         call iMesh_getEntAdj(%VAL(imeshh), 
+     $                        %VAL(faces(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $                        %VAL(iBase_REGION), !/*in*/ const int entity_type_requested,
      $                        ahexPointer, !/*inout*/ iBase_EntityHandle** adj_entity_handles,
      $                        ahexAlloc, !/*inout*/ int* adj_entity_handles_allocated,
      $                        ahexSize , !/*out*/ int* adj_entity_handles_size,
      $                        ierr)
-         IMESH_ASSERT(ierr, imesh)
+         IMESH_ASSERT
 
          do j=1, ahexSize                                
             !get verts adjacent to the hex
             hvtxAlloc = 0
             hvtxPointer = IMESH_NULL                  
-            call iMesh_getEntAdj(MYVAL(imesh), 
-     $                           MYVAL(ahex(j)), !/*in*/ const iBase_EntityHandle entity_handle,
-     $                           MYVAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
+            call iMesh_getEntAdj(%VAL(imeshh), 
+     $                           %VAL(ahex(j)), !/*in*/ const iBase_EntityHandle entity_handle,
+     $                           %VAL(iBase_VERTEX), !/*in*/ const int entity_type_requested,
      $                           hvtxPointer, !/*inout*/ iBase_EntityHandle** adj_entity_handles,
      $                           hvtxAlloc, !/*inout*/ int* adj_entity_handles_allocated,
      $                           hvtxSize , !/*out*/ int* adj_entity_handles_size,
      $                           ierr)
-            IMESH_ASSERT(ierr, imesh)
+            IMESH_ASSERT
 
             !Get the side number
-            call MBCN_SideNumberUlong(MYVAL(hvtxPointer),
-     $                                MYVAL(hexMBCNType), 
-     $                                MYVAL(fvtxPointer), 
-     $                                MYVAL(4), !not fvtxSize, because that's 5 and crashes stuff 
+            call MBCN_SideNumberUlong(%VAL(hvtxPointer),
+     $                                %VAL(hexMBCNType), 
+     $                                %VAL(fvtxPointer), 
+     $                                %VAL(4), !not fvtxSize, because that's 5 and crashes stuff 
                                                ! -- linear nodes are stored first and that's all that's used
-     $                                MYVAL(2), !Dimension of faces
+     $                                %VAL(2), !Dimension of faces
      $                    side_no, side_sense, side_offset) !output
            if ((side_no .lt. 0) .or. (side_no .gt. 5)) ierr = 1
-           IMESH_ASSERT(ierr, imesh)
+           IMESH_ASSERT
 
            side_no = side_no + 1 !moab side number is zero based
 
@@ -553,11 +614,10 @@ c     Given the imesh handle of an element (hex),
 c     return its local nek element number in elno
 c     Cannot be used until the GLLEL array has been set (in map2.f)
 c
-      include 'SIZE'
-      include 'PARALLEL'
 #include "NEKMOAB"
+      include 'PARALLEL'
 
-      IMESH_HANDLE handle
+      IBASE_HANDLE_T handle
       integer elno
 
       !first get global id
@@ -569,21 +629,20 @@ c
 c-----------------------------------------------------------------------
       subroutine nekMOAB_getGlobElNo(handle, elno)
 
-      include 'SIZE'
-      include 'PARALLEL'
 #include "NEKMOAB"
+      include 'PARALLEL'
 
-      IMESH_HANDLE handle
+      IBASE_HANDLE_T handle
       integer elno
       
       integer ierr
 
-      call iMesh_getIntData(MYVAL(imesh), !iMesh_Instance instance,
-     $        MYVAL(handle), !/*in*/ const iBase_EntityHandle entity_handle,
-     $        MYVAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
+      call iMesh_getIntData(%VAL(imeshh), !iMesh_Instance instance,
+     $        %VAL(handle), !/*in*/ const iBase_EntityHandle entity_handle,
+     $        %VAL(globalIdTag), !/*in*/ const iBase_TagHandle tag_handle,
      $        elno,       !/*out*/ int *out_data,
      $        ierr)             !/*out*/ int *err);
-      IMESH_ASSERT(ierr, imesh)
+      IMESH_ASSERT
       
       if (GLLNID(elno) .ne. NID) then
          print *, 'bug... fixme',elno, nid, gllnid(elno)
@@ -789,7 +848,6 @@ c-----------------------------------------------------------------------
 c      subroutine nekMOAB_loadMaterialSets
 c      include 'SIZE'
 c
-c#include "iMesh_f.h"
 c#include "NEKMOAB"
 c
 c      !store material properties here
@@ -798,16 +856,16 @@ c      integer matl
 c      
 cc very similar to the bc-loading code
 c
-c      IMESH_HANDLE entSetHandles(*)
+c      IBASE_HANDLE_T entSetHandles(*)
 c      pointer (entSetHandlesPointer, entSetHandles)
 c      integer entSetAllocated, entSetSize
 c
-c      IMESH_HANDLE matSetTag
+c      IBASE_HANDLE_T matSetTag
 c      integer ierr, i, tagIntData
 c
 cc      matl = -1
 c
-c      call iMesh_getTagHandle(MYVAL(imesh),
+c      call iMesh_getTagHandle(%VAL(imesh),
 c     $     "MATERIAL_SET", !/*in*/ const char* tag_name,
 c     $     matSetTag, !/*out*/ iBase_TagHandle *tag_handle, 
 c     $     ierr)
@@ -815,9 +873,9 @@ c      IMESH_ASSERT(ierr, imesh)
 c
 c      entSetHandlesPointer = IMESH_NULL
 c      entSetAllocated      = 0
-c      call iMesh_getEntSets(MYVAL(imesh),
-c     $     MYVAL(IMESH_NULL),     !/*in*/ const iBase_EntitySetHandle entity_set_handle,
-c     $     MYVAL(1),              !/*in*/ const int num_hops,
+c      call iMesh_getEntSets(%VAL(imesh),
+c     $     %VAL(IMESH_NULL),     !/*in*/ const iBase_EntitySetHandle entity_set_handle,
+c     $     %VAL(1),              !/*in*/ const int num_hops,
 c     $     entSetHandlesPointer, !/*out*/ iBase_EntitySetHandle** contained_set_handles,
 c     $     entSetAllocated,      !/*out*/ int* contained_set_handles_allocated,
 c     $     entSetSize,           !/*out*/ int* contained_set_handles_size,
@@ -825,9 +883,9 @@ c     $     ierr)                 !/*out*/ int *err);
 c      IMESH_ASSERT(ierr, imesh)
 c
 c      do i=1, entSetSize
-c         call iMesh_getIntData(MYVAL(imesh), !iMesh_Instance instance,
-c     $        MYVAL(entSetHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
-c     $        MYVAL(matSetTag), !/*in*/ const iBase_TagHandle tag_handle,
+c         call iMesh_getIntData(%VAL(imesh), !iMesh_Instance instance,
+c     $        %VAL(entSetHandles(i)), !/*in*/ const iBase_EntityHandle entity_handle,
+c     $        %VAL(matSetTag), !/*in*/ const iBase_TagHandle tag_handle,
 c     $        tagIntData,       !/*out*/ int *out_data,
 c     $        ierr)             !/*out*/ int *err);
 c
@@ -845,4 +903,3 @@ c
 c      return
 c      end 
 c-----------------------------------------------------------------------
-

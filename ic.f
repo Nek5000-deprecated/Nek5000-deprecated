@@ -530,6 +530,7 @@ C----------------------------------------------------------------------
       PARAMETER (LPSC9=LDIMT+9)
 
       common /scrcg/ pm1(lx1*ly1*lz1,lelv)
+
       COMMON /SCRNS/ SDUMP(LXYZT,7)
       integer mesg(40)
 

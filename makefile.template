@@ -83,6 +83,7 @@ endif
 
 # MOAB #########################################################################
 ifeq ($(IFMOAB),true)
+  MOABNEK_INCLUDES:=-I$S/3rd_party
   include $(MOAB_DIR)/lib/iMesh-Defs.inc
   MOABO := moab.o imeshutil.o
   lFLAGS := ${lFLAGS} $(IMESH_LFLAGS) $(IMESH_LIBS)
@@ -123,7 +124,7 @@ objdir:
 	@mkdir $(OBJDIR) 2>/dev/null; cat /dev/null 
 
 nek5000:	objdir $(NOBJS)
-	$(F77) -c $(FL2) $(CASEDIR)/${CASENAME}.f -o ${OBJDIR}/${CASENAME}.o 
+	$(F77) -c $(FL2) $(CASEDIR)/${CASENAME}.f $(MOABNEK_INCLUDES) $(IMESH_INCLUDES) -o ${OBJDIR}/${CASENAME}.o 
 	$(F77) -o ${BINNAME} $G ${OBJDIR}/${CASENAME}.o $(NOBJS) $(lFLAGS)
 	@if test -f ${BINNAME}; then \
 	echo "#############################################################"; \

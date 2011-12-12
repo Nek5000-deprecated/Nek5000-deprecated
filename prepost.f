@@ -1203,7 +1203,7 @@ C
       include 'SIZE'
       include 'TOTAL'
 c
-      common /scrcg/ pm1 (lx1,ly1,lz1,lelv)
+      common /scrcg/ pm1    (lx1,ly1,lz1,lelv)
 C
 C     Fill work array
 C
@@ -1348,7 +1348,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
       include 'RESTART'
-      common /scrcg/ pm1 (lx1,ly1,lz1,lelv)  ! mapped pressure
+      common /scrcg/ pm1    (lx1,ly1,lz1,lelv)
 
       integer*8 offs0,offs,nbyte,stride,strideB,nxyzo8
       character*3 prefix

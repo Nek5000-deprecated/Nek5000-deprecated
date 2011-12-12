@@ -1,0 +1,12 @@
+      common /scrcg/ 
+     $	     rpp1, rpp2, rpp3, rpp4
+c     $  pm1 (lx1,ly1,lz1,lelv)  ! mapped pressure
+      parameter (lia = lx1*ly1*lz1*lelv - 2 - 2*lelt)
+      pointer (rpp1, pm1(lx1, ly1, lz1, lelv))
+      pointer (rpp1, d(lx1*ly1*lz1*lelv))
+      pointer (rpp2, wk(lx1*ly1*lz1*lelv))
+      pointer (rpp1, ntri(lelt+1))
+      pointer (rpp3, nmask(lelt+1))
+      pointer (rpp4, ia(lia))
+
+

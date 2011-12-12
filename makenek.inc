@@ -270,6 +270,11 @@ do
          echo "ABORT: Cannot find " $MOAB_DIR 
          exit 1
        fi 
+       if [ ! -f $MOAB_DIR/lib/iMesh-Defs.inc ]; then
+         echo "ABORT: Cannot find iMesh-Defs.inc in" $MOAB_DIR"/lib; make sure MOAB is installed."
+	 echo "       (to install, use 'make install' in" $MOAB_DIR")"
+         exit 1
+       fi 
      fi
    fi
 
@@ -517,6 +522,39 @@ c automatically added by makenek
 _ACEOF
 fi
 
+if [ ! -f ${SOURCE_ROOT}/GEOM ]; then 
+  DIFF_MOAB=1
+else
+  DIFF_MOAB=`diff -q ${SOURCE_ROOT}/GEOM ${SOURCE_ROOT}/GEOM.moab`
+fi
+
+if [ ! -f ${SOURCE_ROOT}/GEOM ]; then 
+  DIFF_NEK=1 
+else
+  DIFF_NEK=`diff -q ${SOURCE_ROOT}/GEOM ${SOURCE_ROOT}/GEOM.nek`
+fi
+
+if [[ "$IFMOAB" == "true" ]]; then
+  if [[ ${DIFF_MOAB} ]]; then
+    echo "MOAB requested and common blocks not MOAB versions; replacing."
+    cp ${SOURCE_ROOT}/GEOM.moab ${SOURCE_ROOT}/GEOM
+    cp ${SOURCE_ROOT}/SCRCG.moab ${SOURCE_ROOT}/SCRCG
+    cp ${SOURCE_ROOT}/SOLN.moab ${SOURCE_ROOT}/SOLN
+    rm -f obj/*.o
+  else
+    echo "Using MOAB configuration."
+  fi
+elif [[ "$IFMOAB" == "false" && ${DIFF_NEK} ]]; then
+  echo "Nek requested and common blocks are MOAB versions, replacing."
+  cp ${SOURCE_ROOT}/GEOM.nek ${SOURCE_ROOT}/GEOM
+  cp ${SOURCE_ROOT}/SCRCG.nek ${SOURCE_ROOT}/SCRCG
+  cp ${SOURCE_ROOT}/SOLN.nek ${SOURCE_ROOT}/SOLN
+  echo "  Deleting all object files, since dependencies on common blocks aren't tracked properly."
+  rm -f obj/*.o
+fi
+
 if [ $NOCOMPILE -eq 1 ]; then
   exit 0
 fi 
+
+

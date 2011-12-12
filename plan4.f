@@ -391,7 +391,7 @@ c
       include 'SIZE'
       include 'TOTAL'
    
-      real vext(lx1*ly1*lz1*lelv,1) 
+      real vext(lx1*ly1*lz1*lelv,*) 
 
       NTOT = NX1*NY1*NZ1*NELV
 
