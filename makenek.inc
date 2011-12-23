@@ -526,19 +526,20 @@ if [ ! -f ${SOURCE_ROOT}/GEOM ]; then
   DIFF_MOAB=1
 else
   DIFF_MOAB=`diff -q ${SOURCE_ROOT}/GEOM ${SOURCE_ROOT}/GEOM.moab`
+  DIFF_MOAB+=`diff -q ${SOURCE_ROOT}/SOLN ${SOURCE_ROOT}/SOLN.moab`
 fi
 
 if [ ! -f ${SOURCE_ROOT}/GEOM ]; then 
   DIFF_NEK=1 
 else
   DIFF_NEK=`diff -q ${SOURCE_ROOT}/GEOM ${SOURCE_ROOT}/GEOM.nek`
+  DIFF_NEK+=`diff -q ${SOURCE_ROOT}/SOLN ${SOURCE_ROOT}/SOLN.nek`
 fi
 
 if [[ "$IFMOAB" == "true" ]]; then
   if [[ ${DIFF_MOAB} ]]; then
     echo "MOAB requested and common blocks not MOAB versions; replacing."
     cp ${SOURCE_ROOT}/GEOM.moab ${SOURCE_ROOT}/GEOM
-    cp ${SOURCE_ROOT}/SCRCG.moab ${SOURCE_ROOT}/SCRCG
     cp ${SOURCE_ROOT}/SOLN.moab ${SOURCE_ROOT}/SOLN
     rm -f obj/*.o
   else
@@ -547,7 +548,6 @@ if [[ "$IFMOAB" == "true" ]]; then
 elif [[ "$IFMOAB" == "false" && ${DIFF_NEK} ]]; then
   echo "Nek requested and common blocks are MOAB versions, replacing."
   cp ${SOURCE_ROOT}/GEOM.nek ${SOURCE_ROOT}/GEOM
-  cp ${SOURCE_ROOT}/SCRCG.nek ${SOURCE_ROOT}/SCRCG
   cp ${SOURCE_ROOT}/SOLN.nek ${SOURCE_ROOT}/SOLN
   echo "  Deleting all object files, since dependencies on common blocks aren't tracked properly."
   rm -f obj/*.o

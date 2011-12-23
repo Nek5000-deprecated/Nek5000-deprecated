@@ -1,7 +1,6 @@
 C
 C     Geometry arrays
 C
-      integer*8 rpxm1, rpym1, rpzm1
       pointer (rpxm1, xm1(lx1, ly1, lz1, lelt))
       pointer (rpym1, ym1(lx1, ly1, lz1, lelt))
       pointer (rpzm1, zm1(lx1, ly1, lz1, lelt))

@@ -41,6 +41,7 @@ C     Read Mesh Info
         if (ifmoab) then
            read(9,*) h5mfle
            read(9,*) ! dummy 
+           nelgs = 0
         else
            read(9,*)  nelgs,ndim,nelgv
            nelgt = abs(nelgs)
@@ -568,7 +569,16 @@ c     set I/O format handling
          param(66) = 6        ! binary is default
       endif
 
+#ifndef MOAB
+      if (ifmoab) then
+         print *,"ABORT: ifmoab = .true. in input but this ",
+     $ "version of nek not compiled with MOAB."
+         call exitti
+      endif
+#endif
+
       return
+
 C
 C     Error handling:
 C

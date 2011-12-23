@@ -85,7 +85,7 @@ endif
 ifeq ($(IFMOAB),true)
   MOABNEK_INCLUDES:=-I$S/3rd_party
   include $(MOAB_DIR)/lib/iMesh-Defs.inc
-  MOABO := moab.o imeshutil.o
+  MOABO := moab.o imeshutil.o imeshcutil.o
   lFLAGS := ${lFLAGS} $(IMESH_LFLAGS) $(IMESH_LIBS)
 endif
 
@@ -253,4 +253,5 @@ $(OBJDIR)/ssygv.o     	:$S/3rd_party/ssygv.f;  	$(F77) -c $(FL2i4) $< -o $@
 $(OBJDIR)/blas.o   	:$S/3rd_party/blas.f;		$(F77) -c $(FL2i4) $< -o $@
 $(OBJDIR)/moab.o        :$S/3rd_party/moab.f;           $(F77) -c $(FL2) $(IMESH_INCLUDES) $< -o $@
 $(OBJDIR)/imeshutil.o   :$S/3rd_party/imeshutil.f;  	$(F77) -c $(FL2) $(IMESH_INCLUDES) $< -o $@
+$(OBJDIR)/imeshcutil.o   :$S/3rd_party/imeshcutil.c;  	$(CC) -c $(cFL2) $< -o $@
 
