@@ -535,7 +535,7 @@ C
 
 c        write(6,*) 'chkj1'
 c        call outxm3j(xm3,ym3,jacm3)
-
+         
          CALL CHKJAC(JACM3(1,1,1,ie),NXYZ3,ie,xm3,ym3,zm3,ndim,ierr)
          if (ierr.eq.1) kerr = kerr+1
          CALL MAP31 (RXM1(1,1,1,ie),RXM3(1,1,1,ie),ie)
@@ -677,6 +677,7 @@ C-----------------------------------------------------------------------
       INCLUDE 'MASS'
       INCLUDE 'TSTEP'
       INCLUDE 'WZ'
+      INCLUDE 'DXYZ'
 C
 C     Note: Subroutines GLMAPM1, GEODAT1, AREA2, SETWGTR and AREA3 
 C           share the same array structure in Scratch Common /SCRNS/.
@@ -698,6 +699,7 @@ C
       IF (IFGMSH3 .AND. ISTEP.EQ.0)
      $   CALL XYZRST (XRM1,YRM1,ZRM1,XSM1,YSM1,ZSM1,XTM1,YTM1,ZTM1,
      $                IFAXIS)
+      
 C
       IF (.NOT.IFAXIS) THEN
          CALL INVERS2 (WJ,JACM1,NTOT1)
@@ -722,6 +724,7 @@ C
 C
 C     Compute geometric factors for integrated del-squared operator.
 C
+
       IF (NDIM.EQ.2) THEN
          CALL VDOT2 (G1M1,RXM1,RYM1,RXM1,RYM1,NTOT1)
          CALL VDOT2 (G2M1,SXM1,SYM1,SXM1,SYM1,NTOT1)
@@ -1044,6 +1047,7 @@ C
       INCLUDE 'SIZE'
       INCLUDE 'GEOM'
       INCLUDE 'INPUT'
+      INCLUDE 'ADAPT'
 C
       NSRF  = 6*NX1*NZ1*NELT
 C
@@ -1374,7 +1378,6 @@ C--------------------------------------------------------------------
       end
 
 c-----------------------------------------------------------------------
-
       subroutine maprs(y,x,xa,nrest,iel)
 C
 C     Map the elemental array X from Restart mesh to Y on mesh M1

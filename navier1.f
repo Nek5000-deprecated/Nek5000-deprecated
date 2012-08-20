@@ -2556,13 +2556,16 @@ C
 C---------------------------------------------------------------
       include 'SIZE'
       include 'MASS'
+      include 'ADAPT'
 C
       REAL           X  (LX1,LY1,LZ1,1)
       COMMON /SCRNRM/ Y  (LX1,LY1,LZ1,LELT)
      $               ,TA1(LX1,LY1,LZ1,LELT)
      $               ,TA2(LX1,LY1,LZ1,LELT)
+      COMMON /ISTEP2/ IFIELD
       REAL H1,SEMI,L2,LINF
-      REAL LENGTH
+      REAL LENGTH,ntot1,nxyz1
+      integer ptr
 C
       IF (IMESH.EQ.1) THEN
          NEL = NELV
@@ -2574,6 +2577,7 @@ C
       LENGTH = VOL**(1./(NDIM))
       NXYZ1  = NX1*NY1*NZ1
       NTOT1  = NXYZ1*NEL
+      if (ifadapt) ntot1 = ntota(ifield)
 C
       H1     = 0.
       SEMI   = 0.
@@ -2583,13 +2587,23 @@ C
       LINF = GLAMAX (X,NTOT1)
 C
       CALL COL3   (TA1,X,X,NTOT1)
-      CALL COL2   (TA1,BM1,NTOT1)
+      if (ifadapt) then
+        ptr = adptr(1,ifield)
+        if (ifield.ne.1) ptr = ptr+ntota(1)
+        CALL COL2   (TA1,BM1A(ptr),NTOT1)
+      else
+        CALL COL2   (TA1,BM1,NTOT1)
+      end if
       L2   = GLSUM  (TA1,NTOT1)
       IF (L2.LT.0.0) L2 = 0.
 C
       CALL RONE   (TA1,NTOT1)
       CALL RZERO  (TA2,NTOT1)
-      CALL AXHELM (Y,X,TA1,TA2,IMESH,1)
+      if (ifadapt) then
+        CALL AXHELMA(Y,X,TA1,TA2,IMESH,1)
+      else
+        CALL AXHELM (Y,X,TA1,TA2,IMESH,1)
+      end if
       CALL COL3   (TA1,Y,X,NTOT1)
       SEMI = GLSUM  (TA1,NTOT1)
       IF (SEMI.LT.0.0) SEMI = 0.
@@ -3858,7 +3872,7 @@ c     if (istep.gt.5) call exitti(' CONVOP dbg: $',ip99)
 
       if (param(99).eq.2.or.param(99).eq.3) then  
          call conv1d(conv,fi)  !    use dealiased form
-      elseif (param(99).eq.4) then
+      elseif (param(99).eq.4) then      
          if (ifpert) then
            call convect_new (conv,fi,.false.,vx,vy,vz,.false.)
          else
@@ -3948,7 +3962,7 @@ c
       include 'SOLN'
       include 'TSTEP'
 c
-      real  du  (lx1*ly1*lz1,1)
+      real  du  (lx1*ly1*lz1,lelt)
       real  u   (lx1,ly1,lz1,1)
 c
       common /fastmd/ ifdfrm(lelt), iffast(lelt), ifh2, ifsolv

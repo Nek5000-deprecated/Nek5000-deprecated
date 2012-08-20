@@ -118,10 +118,10 @@ C      ENDIF
 ! synchronize time step for multiple sessions
       if (ifneknek) dt=uglmin(dt,1)
 c
-      if (iffxdt.and.abs(courno).gt.10.*abs(ctarg)) then
-         if (nid.eq.0) write(6,*) 'CFL, Ctarg!',courno,ctarg
-         call emerxit
-      endif
+      !if (iffxdt.and.abs(courno).gt.10.*abs(ctarg)) then
+      !   if (nid.eq.0) write(6,*) 'CFL, Ctarg!',courno,ctarg
+      !   call emerxit
+      !endif
 
 
       RETURN
@@ -166,6 +166,7 @@ C---------------------------------------------------------------------
       INCLUDE 'SIZE'
       INCLUDE 'SOLN'
       INCLUDE 'TSTEP'
+      INCLUDE 'ADAPT'
 C
       IF (IFIELD.EQ.1) THEN
 C
@@ -190,9 +191,16 @@ C
 C
 C     Compute norms of a passive scalar
 C
+      if (ifadapt) then
+         CALL NORMSC (TNRMH1(IFIELD-1),TNRMSM(IFIELD-1),
+     $                TNRML2(IFIELD-1),TNRML8(IFIELD-1),
+     $                     Tad(adptr(1,IFIELD)),IMESH)
+
+      else
          CALL NORMSC (TNRMH1(IFIELD-1),TNRMSM(IFIELD-1),
      $                TNRML2(IFIELD-1),TNRML8(IFIELD-1),
      $                     T(1,1,1,1,IFIELD-1),IMESH)
+      endif
          TMEAN(IFIELD-1) = 0.
       ENDIF
 C
@@ -352,8 +360,12 @@ C
       COLD   = COURNO
       CMAX   = 1.2*CTARG
       CMIN   = 0.8*CTARG
-      CALL CUMAX (VX,VY,VZ,UMAX)
-C
+!      if (ifadapt.and.maxval(maxord).gt.lx1) then
+!        CALL CUMAXA(VX,VY,VZ,UMAX)
+!      else
+        CALL CUMAX (VX,VY,VZ,UMAX)
+!      endif
+
 C     Zero DT
 C
       IF (DT .EQ. 0.0) THEN
@@ -414,7 +426,7 @@ C
          VOLD = VCOUR
       ENDIF
       CPRED  = 2.*COURNO-COLD
-C
+ 
 C     Change DT if it is too big or if it is too small 
 C
 c     if (nid.eq.0) 
@@ -478,6 +490,7 @@ C
       INCLUDE 'WZ'
       INCLUDE 'GEOM'
       INCLUDE 'INPUT'
+      INCLUDE 'ADAPT'
 C
       COMMON /SCRNS/ XRM1 (LX1,LY1,LZ1,LELV)
      $ ,             XSM1 (LX1,LY1,LZ1,LELV)
@@ -495,9 +508,13 @@ C
      $ ,             R    (LX1,LY1,LZ1,LELV)
       COMMON /DELRST/ DRST(LX1),DRSTI(LX1)
 C
+      REAL ZGM1U(lx1u,3),wk(lx1u),DRSTU(lx1u,lx1u)
+      integer nxu(ldimt1),ifld,ptr,ctr,j
+ 
       DIMENSION V1(LX1,LY1,LZ1,1)
      $        , V2(LX1,LY1,LZ1,1)
      $        , V3(LX1,LY1,LZ1,1)
+      real  vxe(lx1u*ly1u*lz1u),vye(lx1u*ly1u*lz1u),vze(lx1u*ly1u*lz1u)
       DIMENSION U3(3)
       INTEGER ICALLD
       SAVE    ICALLD
@@ -506,6 +523,10 @@ C
       NTOT  = NX1*NY1*NZ1*NELV
       NTOTL = LX1*LY1*LZ1*LELV
       NTOTD = NTOTL*NDIM
+      if (ifadapt) then
+         ntot = lx1*ly1*lz1*nelv
+         nx1 = lx1; ny1 = ly1; nz1 = lz1;
+      endif
 C
 C     Compute isoparametric partials.
 C
@@ -516,14 +537,29 @@ C     Compute maximum U/DX
 C
       IF (ICALLD.EQ.0) THEN
          ICALLD=1
-         DRST (1)=ABS(ZGM1(2,1)-ZGM1(1,1))
-         DRSTI(1)=1.0/DRST(1)
-         DO 400 I=2,NX1-1
-            DRST (I)=ABS(ZGM1(I+1,1)-ZGM1(I-1,1))/2.0
-            DRSTI(I)=1.0/DRST(I)
- 400     CONTINUE
-         DRST (NX1)=DRST(1)
-         DRSTI(NX1)=1.0/DRST(NX1)
+         if (ifadapt) then
+           ! Same procedure on min to max grid
+           do j=lx1,lx1u 
+             call zwgll(zgm1u,wk,j)
+             DRSTU(1,j)=ABS(ZGM1U(2,1)-ZGM1U(1,1))
+             DRSTUI(1,j)=1.0/DRSTU(1,j)
+             DO 300 I=2,j-1
+                DRSTU (I,j)=ABS(ZGM1U(I+1,1)-ZGM1U(I-1,1))/2.0
+                DRSTUI(I,j)=1.0/DRSTU(I,j)
+ 300         CONTINUE
+             DRSTU (j,j)=DRSTU(1,j)
+             DRSTUI(j,j)=1.0/DRSTU(j,j)
+           end do
+         else
+           DRST (1)=ABS(ZGM1(2,1)-ZGM1(1,1))
+           DRSTI(1)=1.0/DRST(1)
+           DO 400 I=2,NX1-1
+              DRST (I)=ABS(ZGM1(I+1,1)-ZGM1(I-1,1))/2.0
+              DRSTI(I)=1.0/DRST(I)
+ 400       CONTINUE
+           DRST (NX1)=DRST(1)
+           DRSTI(NX1)=1.0/DRST(NX1)
+         endif
       ENDIF
 C
 C     Zero out scratch arrays U,V,W for ALL declared elements...
@@ -571,19 +607,48 @@ C
 C
       ENDIF
 C
-      DO 500 IE=1,NELV
-      DO 500 IX=1,NX1
-      DO 500 IY=1,NY1
-      DO 500 IZ=1,NZ1
-            U(IX,IY,IZ,IE)=ABS( U(IX,IY,IZ,IE)*DRSTI(IX) )
-            V(IX,IY,IZ,IE)=ABS( V(IX,IY,IZ,IE)*DRSTI(IY) )
-            W(IX,IY,IZ,IE)=ABS( W(IX,IY,IZ,IE)*DRSTI(IZ) )
-  500    CONTINUE
+      if (ifadapt) then
+        iord = 0
+        ptr = 0
+        DO 500 IE=1,NELV
+          do ifld=1,ldimt1
+            call getord(ie,ifld)
+            nxu(ifld) = nx1
+          end do
+          ifld = maxloc(nxu,1)
+          call getord(ie,ifld)
+          call MapV(vxe,vye,vze,U,V,W,ie,ifld)
+          ctr = 0
+          DO 500 IZ=1,nz1
+          DO 500 IY=1,ny1
+          DO 500 IX=1,nx1
+              ctr = ctr+1
+              ptr = ptr+1
+              VXA(ptr)=ABS(VXE(ctr)*DRSTUI(IX,nx1) )
+              VYA(ptr)=ABS(VYE(ctr)*DRSTUI(IY,nx1) )
+              VZA(ptr)=ABS(VZE(ctr)*DRSTUI(IZ,nx1) )
+  500      CONTINUE
 C
-      U3(1)   = VLMAX(U,NTOT)
-      U3(2)   = VLMAX(V,NTOT)
-      U3(3)   = VLMAX(W,NTOT)
-      UMAX    = GLMAX(U3,3)
+
+        U3(1)   = VLMAX(VXA,ptr)
+        U3(2)   = VLMAX(VYA,ptr)
+        U3(3)   = VLMAX(VZA,ptr)
+        UMAX    = GLMAX(U3,3)
+      else
+        DO 600 IE=1,NELV
+        DO 600 IZ=1,NZ1
+        DO 600 IY=1,NY1
+        DO 600 IX=1,NX1
+              U(IX,IY,IZ,IE)=ABS( U(IX,IY,IZ,IE)*DRSTI(IX) )
+              V(IX,IY,IZ,IE)=ABS( V(IX,IY,IZ,IE)*DRSTI(IY) )
+              W(IX,IY,IZ,IE)=ABS( W(IX,IY,IZ,IE)*DRSTI(IZ) )
+  600      CONTINUE
+C
+        U3(1)   = VLMAX(U,NTOT)
+        U3(2)   = VLMAX(V,NTOT)
+        U3(3)   = VLMAX(W,NTOT)
+        UMAX    = GLMAX(U3,3)
+      endif
 C
       RETURN
       END
@@ -995,7 +1060,9 @@ C-----------------------------------------------------------------------
       INCLUDE 'INPUT'
       INCLUDE 'SOLN'
       INCLUDE 'TSTEP'
+      INCLUDE 'ADAPT'
       LOGICAL  IFKFLD,IFEFLD
+      integer  offset,ptr
 C
       NXYZ1 = NX1*NY1*NZ1
       NEL   = NELFLD(IFIELD)
@@ -1036,11 +1103,26 @@ C
 C
 C...  No turbulence models, OR current field is not k or e.
 C
+C     ! ntot and offset used for adaptive case
+      if (ifadapt) then
+        ntot = ntota(ifield) 
+        offset = ntota(1)
+      endif
+      
       DO 1000 IEL=1,NEL
 C
          IGRP=IGROUP(IEL)
-
-         if (ifuservp) then
+ 
+         ! Since vdiff and vtrans are defined for velocity, too we
+         ! need to offset our pointer
+         if (ifadapt) then
+           call getord(iel,ifield)
+           nxyz1 = nx1*ny1*nz1
+           ptr = adptr(iel,ifield)
+           if (ifield.ne.1) ptr = ptr+offset
+         endif
+ 
+         if (ifuservp) then  ! KED: Get back to user conditions later
 C
 C           User specified fortran function   (pff 2/13/01)
             CALL NEKUVP (IEL)
@@ -1056,8 +1138,15 @@ C           Constant property within groups of elements
 C
             CDIFF  = CPGRP(IGRP,IFIELD,1)
             CTRANS = CPGRP(IGRP,IFIELD,2)
-            CALL CFILL(VDIFF (1,1,1,IEL,IFIELD),CDIFF,NXYZ1)
-            CALL CFILL(VTRANS(1,1,1,IEL,IFIELD),CTRANS,NXYZ1)
+            
+            if (ifadapt) then
+              CALL CFILL(VDIFFA (ptr),CDIFF,NXYZ1)
+              CALL CFILL(VTRANSA(ptr),CTRANS,NXYZ1)
+            else
+              CALL CFILL(VDIFF (1,1,1,IEL,IFIELD),CDIFF,NXYZ1)
+              CALL CFILL(VTRANS(1,1,1,IEL,IFIELD),CTRANS,NXYZ1)
+            endif
+
             IF (CDIFF.LE.0.0) THEN
                WRITE(6,100) CDIFF,IFIELD,IGRP
   100          FORMAT(2X,'ERROR:  Non-positive diffusivity ('
@@ -1086,8 +1175,13 @@ C
             CDIFF  = CPFLD(IFIELD,1)
             CTRANS = CPFLD(IFIELD,2)
 c           write(6,*) 'vdiff:',ifield,cdiff,ctrans
-            CALL CFILL(VDIFF (1,1,1,IEL,IFIELD),CDIFF,NXYZ1)
-            CALL CFILL(VTRANS(1,1,1,IEL,IFIELD),CTRANS,NXYZ1)
+            if (ifadapt) then
+              CALL CFILL(VDIFFA (ptr),CDIFF,NXYZ1)
+              CALL CFILL(VTRANSA(ptr),CTRANS,NXYZ1)
+            else
+              CALL CFILL(VDIFF (1,1,1,IEL,IFIELD),CDIFF,NXYZ1)
+              CALL CFILL(VTRANS(1,1,1,IEL,IFIELD),CTRANS,NXYZ1)
+            endif
             IF (CDIFF.LE.0.0) THEN
                WRITE(6,200) CDIFF,IFIELD
   200          FORMAT(2X,'ERROR:  Non-positive diffusivity ('

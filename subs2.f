@@ -1050,7 +1050,10 @@ C
          IF (CB.EQ.'SYM' .OR. CB.EQ.'A  ' .OR. CB.EQ.'WS ' .OR.
      $       CB.EQ.'ws ' .OR. CB.EQ.'WSL' .OR. CB.EQ.'wsl' .OR. 
      $       CB.EQ.'SH ' .OR. CB.EQ.'sh ' .OR. CB.EQ.'SHL' .OR. 
-     $       CB.EQ.'shl')                                  THEN
+     $       CB.EQ.'shl' .OR. CB.EQ.'ms ')                 THEN
+             ! MARAGONI: adding ms above zeroes out normal velocity
+             ! component while letting the other two be surface tension
+             ! conditions
              CALL FACEV (HVMASK,IEL,IFC,2.0,NX1,NY1,NZ1)
              CALL CFILL (HFMASK(1,1,IFC,IEL),2.0,NXZ1)
          ENDIF
@@ -1091,10 +1094,10 @@ c     write(6,*) 'MASK this is ifield:',ifield
       DO 220 IFC=1,NFACE
          CB=CBC(IFC,IEL,IFLD)
          IF (CB(1:1).EQ.'M' .OR. CB(1:1).EQ.'m') THEN
-c            CALL FACEV (HVMASK,IEL,IFC,1.0,NX1,NY1,NZ1)
-c            CALL CFILL (HFMASK(1,1,IFC,IEL),1.0,NXZ1)
-             CALL FACEV (HVMASK,IEL,IFC,2.0,NX1,NY1,NZ1)
-             CALL CFILL (HFMASK(1,1,IFC,IEL),2.0,NXZ1)
+C            CALL FACEV (HVMASK,IEL,IFC,1.0,NX1,NY1,NZ1)
+C            CALL CFILL (HFMASK(1,1,IFC,IEL),1.0,NXZ1)
+            CALL FACEV (HVMASK,IEL,IFC,2.0,NX1,NY1,NZ1)
+            CALL CFILL (HFMASK(1,1,IFC,IEL),2.0,NXZ1)
          ENDIF
   220 CONTINUE
 C

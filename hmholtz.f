@@ -219,13 +219,10 @@ C
            CALL ADD2 (AU(1,1,1,IEL),TM1,NXYZ)
            CALL ADD2 (AU(1,1,1,IEL),TM2,NXYZ)
            CALL ADD2 (AU(1,1,1,IEL),TM3,NXYZ)
-C
            ENDIF
-C
         ENDIF
-C
  100  CONTINUE
-C
+           
       IF (IFH2) CALL ADDCOL4 (AU,HELM2,BM1,U,NTOT)
 C
 C     If axisymmetric, add a diagonal term in the radial direction (ISD=2)
@@ -260,7 +257,6 @@ C
 #endif
       return
       END
-C
 c=======================================================================
       subroutine setfast (helm1,helm2,imesh)
 C-------------------------------------------------------------------
@@ -270,14 +266,18 @@ C
 C-------------------------------------------------------------------
       INCLUDE 'SIZE'
       INCLUDE 'INPUT'
+      INCLUDE 'ADAPT'
       COMMON /FASTMD/ IFDFRM(LELT), IFFAST(LELT), IFH2, IFSOLV
+      COMMON /ISTEP2/ IFIELD
       LOGICAL IFDFRM, IFFAST, IFH2, IFSOLV
       REAL HELM1(NX1,NY1,NZ1,1), HELM2(NX1,NY1,NZ1,1)
+      integer ptr
 C
       IF (IMESH.EQ.1) NEL=NELV
       IF (IMESH.EQ.2) NEL=NELT
       NXYZ = NX1*NY1*NZ1
       NTOT = NXYZ*NEL
+      if (ifadapt) ntot = ntota(ifield)
 C
       DELTA = 1.E-9
       X    = 1.+DELTA
@@ -287,6 +287,12 @@ C
       IF (DIFF.GT.0.0) EPSM = 1.E-13
 C
       DO 100 ie=1,NEL
+         ptr = nxyz*(ie-1)+1
+         if (ifadapt) then
+            ptr = adptr1(ie,ifield)
+            call getord(ie,ifield)
+            nxyz = nx1*ny1*nz1
+         end if
          IFFAST(ie) = .FALSE.
          IF (IFDFRM(ie).OR.IFAXIS .OR. IFMODEL ) THEN
             IFFAST(ie) = .FALSE.
@@ -393,11 +399,13 @@ C-------------------------------------------------------------------
       INCLUDE 'INPUT'
       INCLUDE 'TSTEP'
       INCLUDE 'MASS'
+      INCLUDE 'ADAPT'
       REAL            DPCM1 (LX1,LY1,LZ1,1)
       COMMON /FASTMD/ IFDFRM(LELT), IFFAST(LELT), IFH2, IFSOLV
       LOGICAL IFDFRM, IFFAST, IFH2, IFSOLV
       REAL            HELM1(NX1,NY1,NZ1,1), HELM2(NX1,NY1,NZ1,1)
       REAL YSM1(LY1)
+      INTEGER nx1prev, ny1prev, nz1prev
 
       IF(IMESH.EQ.1) NEL=NELV
       IF(IMESH.EQ.2) NEL=NELT
@@ -624,6 +632,7 @@ C------------------------------------------------------------------------
       INCLUDE 'TSTEP'
       include 'FDMH1'
       include 'GEOM'
+      include 'ADAPT'
 c
       COMMON  /CPRINT/ IFPRINT, IFHZPC
       LOGICAL          IFPRINT, IFHZPC
@@ -683,7 +692,7 @@ C
       elseif(param(100).ne.2) then
          call set_fdm_prec_h1b(d,h1,h2,nel)
       endif
-c
+
       call copy (r,f,n)
       call rzero(x,n)
       call rzero(p,n)

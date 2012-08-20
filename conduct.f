@@ -107,7 +107,6 @@ C        Radiation case, smooth convergence, avoid flip-flop (ER).
 
       return
       end
-
 c-----------------------------------------------------------------------
       subroutine makeuq
 
@@ -161,6 +160,7 @@ c     Set user specified volumetric forcing function (e.g. heat source).
 C   
       return
       end
+c-----------------------------------------------------------------------
 C
       subroutine nekuq (bql,iel)
 C------------------------------------------------------------------
@@ -262,10 +262,12 @@ C
       COMMON /SCRNS/ TA (LX1,LY1,LZ1,LELT)
      $ ,             TB (LX1,LY1,LZ1,LELT)
      $ ,             H2 (LX1,LY1,LZ1,LELT)
+
 C
       NEL   = NELFLD(IFIELD)
       NTOT1 = NX1*NY1*NZ1*NEL
       CONST = 1./DT
+
       CALL COPY  (H2,VTRANS(1,1,1,1,IFIELD),NTOT1)
       CALL CMULT (H2,CONST,NTOT1)
 C
@@ -551,16 +553,34 @@ C-----------------------------------------------------------------------
       include 'INPUT'
       include 'SOLN'
       include 'TSTEP'
+      include "ADAPT"
 C
+      integer ntotall,ntot1,ilag,ptr1,ptr2
+ 
       NTOT1 = NX1*NY1*NZ1*NELFLD(IFIELD)
+      if (ifadapt)  then
+        ntotall = 0
+        do i=2,ifield-1
+          ntotall = ntotall + ntota(i)
+        end do
+        ntot1 = ntota(ifield)
+        do ilag=nbdinp-1,2,-1
+          ptr1 = ntotall*(nbdinp-1)+ntot1*(ilag-2)+1
+          ptr2 = ntotall*(nbdinp-1)+ntot1*(ilag-1)+1
+          call copy(tlaga(ptr2),tlaga(ptr1),ntot1) 
+        end do  
+        ptr2 = ptr1 
+        ptr1 = adptr(1,ifield)
+        CALL COPY (TLAGA(ptr2),TAD(ptr1),NTOT1)
+      else
+        DO 100 ILAG=NBDINP-1,2,-1
+           CALL COPY (TLAG(1,1,1,1,ILAG  ,IFIELD-1),
+     $                TLAG(1,1,1,1,ILAG-1,IFIELD-1),NTOT1)
+ 100    CONTINUE
 C
-      DO 100 ILAG=NBDINP-1,2,-1
-         CALL COPY (TLAG(1,1,1,1,ILAG  ,IFIELD-1),
-     $              TLAG(1,1,1,1,ILAG-1,IFIELD-1),NTOT1)
- 100  CONTINUE
-C
-      CALL COPY (TLAG(1,1,1,1,1,IFIELD-1),T(1,1,1,1,IFIELD-1),NTOT1)
-C
+        CALL COPY (TLAG(1,1,1,1,1,IFIELD-1),T(1,1,1,1,IFIELD-1),NTOT1)
+      end if    
+ 
       return
       end
 c-----------------------------------------------------------------------

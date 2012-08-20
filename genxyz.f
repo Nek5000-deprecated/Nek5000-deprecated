@@ -582,7 +582,6 @@ c already read/initialized vertex positions
 c     Initialize geometry arrays with bi- triquadratic deformations
       call linquad(xml,yml,zml,nxl,nyl,nzl)
 
-
       do ie=1,nelt
 
          call setzgml (zgml,ie,nxl,nyl,nzl,ifaxis)
@@ -1294,7 +1293,7 @@ c        5+-----+6    t                      5+-----+6    t
       save    indx
       data    indx / 1,2,4,3,5,6,8,7 /
 
-      parameter (ldw=4*lx1*ly1*lz1)
+      parameter (ldw=4*lx1u*ly1u*lz1u)
       common /ctmp0/ xcb(2,2,2),ycb(2,2,2),zcb(2,2,2),w(ldw)
 
       common /cxyzl/ zgml(lx1,3),jx (lx1*2),jy (lx1*2),jz (lx1*2)
@@ -1327,11 +1326,10 @@ c        5+-----+6    t                      5+-----+6    t
 c     Map R-S-T space into physical X-Y-Z space.
 
       ! NOTE:  Assumes nxl=nyl=nzl !
-
       call tensr3(xl,nxl,xcb,2,jx,jyt,jzt,w)
       call tensr3(yl,nxl,ycb,2,jx,jyt,jzt,w)
       call tensr3(zl,nxl,zcb,2,jx,jyt,jzt,w)
-
+     
       return
       end
 c-----------------------------------------------------------------------

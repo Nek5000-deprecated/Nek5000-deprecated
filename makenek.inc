@@ -448,7 +448,7 @@ if [ -f "./SIZE" ]; then
   if [ $? -ne 0 ]; then
      echo >>SIZE
      echo 'c automatically added by makenek' >>SIZE
-     echo '      parameter(lxo   = lx1) ! max output grid size (lxo>=lx1)' >>SIZE
+     echo '      parameter(lxo   = lx1u) ! max output grid size (lxo>=lx1u)' >>SIZE
   fi
   cat SIZE | grep -i 'lpart' >/dev/null
   if [ $? -ne 0 ]; then

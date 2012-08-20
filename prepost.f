@@ -275,7 +275,7 @@ C
       common /scrcg/ pm1 (lx1,ly1,lz1,lelv)
 c
 c     note, this usage of CTMP1 will be less than elsewhere if NELT ~> 3.
-      parameter (lxyz=lx1*ly1*lz1)
+      parameter (lxyz=lx1u*ly1u*lz1u)
       parameter (lpsc9=ldimt1+9)
       common /ctmp1/ tdump(lxyz,lpsc9)
       real*4         tdump
@@ -301,6 +301,8 @@ c     note, this usage of CTMP1 will be less than elsewhere if NELT ~> 3.
       data ndumps / 0 /
 
       logical ifxyo_s
+
+      if (ifadapt) nx1 = lx1u; ny1 = ly1u; nz1 = lz1u
 
       if(nid.eq.0) then 
         WRITE(6,1001) istep,time
@@ -416,7 +418,7 @@ C     Figure out what goes in EXCODE
          ENDIF
       endif
      
-
+c
 C     Dump header
       ierr = 0
       if (nid.eq.0) call dump_header(excode,p66,ierr)
@@ -428,7 +430,7 @@ C     Dump header
 
       ierr = 0
       do ieg=1,nelgt
-
+         
          jnid = gllnid(ieg)
          ie   = gllel (ieg)
 
@@ -1225,65 +1227,142 @@ c
 C
 C     Fill work array
 C
-      parameter (lxyz=lx1*ly1*lz1)
+      parameter (lxyz=lx1u*ly1u*lz1u)
       parameter (lpsc9=ldimt1+9)
       real*4 tdump(lxyz,lpsc9)
+      real wk1(lx1u*ly1u*lz1u)
+      integer ptr
 C
-      nxyz = nx1*ny1*nz1
+
+      if (ifadapt) then
+        nxyz = lx1u*ly1u*lz1u
+        ID=0
+        IF(IFXYO)then
+           nx1 = lx1u; ny1 = lx1u; nz1 = lz1u;
+           call genxyz1(xm1e,ym1e,zm1e,lx1u,ly1u,lz1u,ie)
+           ID=ID+1
+           CALL COPYx4(TDUMP(1,ID),XM1E,NXYZ)
+           ID=ID+1
+           CALL COPYx4(TDUMP(1,ID),YM1E,NXYZ)
+           IF(IF3D) then
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),ZM1E,NXYZ)
+           ENDIF
+        ENDIF
 c
-      ID=0
-      IF(IFXYO)then
-         ID=ID+1
-         CALL COPYx4(TDUMP(1,ID),XM1(1,1,1,IE),NXYZ)
-         ID=ID+1
-         CALL COPYx4(TDUMP(1,ID),YM1(1,1,1,IE),NXYZ)
-         IF(IF3D) then
-            ID=ID+1
-            CALL COPYx4(TDUMP(1,ID),ZM1(1,1,1,IE),NXYZ)
-         ENDIF
-      ENDIF
+        IF(IFVO)then
+           call getord(ie,1)       
+           IF (IE.LE.NELV) then
+              call MapV(vxa,vya,vza,vx,vy,vz,ie,ldimt1+1)
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),VXA,NXYZ)
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),VYA,NXYZ)
+              IF(IF3D)then
+                 ID=ID+1
+                 CALL COPYx4(TDUMP(1,ID),VZA,NXYZ)
+              ENDIF
+           ELSE
+              ID=ID+1
+              CALL RZERO4(TDUMP(1,ID),NXYZ)
+              ID=ID+1
+              CALL RZERO4(TDUMP(1,ID),NXYZ)
+              IF(IF3D)then
+                 ID=ID+1
+                 CALL RZERO4(TDUMP(1,ID),NXYZ)
+              ENDIF
+           ENDIF
+        ENDIF
+        IF(IFPO)then
+           IF (IE.LE.NELV) then
+             ID=ID+1
+             call setmapa(lx1,lx1u)
+             call specmp(soltmp,lx1u,PM1(1,1,1,ie),lx1,ixadpt,
+     $                   ixtadpt,wk1)
+             CALL COPYx4(TDUMP(1,ID),soltmp,NXYZ)
+           ELSE
+             ID=ID+1
+             CALL RZERO4(TDUMP(1,ID),NXYZ)
+           ENDIF
+        ENDIF
+        IF(IFTO)then
+           call getord(ie,2)       
+           ID=ID+1
+           call setmapa(nx1,lx1u)
+           ptr = adptr(ie,2)
+           call specmp(soltmp(1),lx1u,Tad(ptr),nx1,ixadpt,ixtadpt,wk1)
+           CALL COPYx4(TDUMP(1,ID),soltmp,NXYZ)
+        ENDIF
+C       PASSIVE SCALARS
+        do iip=1,ldimt1
+           if (ifpsco(iip)) then
+             call getord(ie,2+iip)
+             call setmapa(nx1,lx1u)
+             ptr = adptr(ie,2+iip)
+             call specmp(soltmp(1),lx1u,Tad(ptr),nx1,ixadpt,ixtadpt,wk1)
+             id=id+1
+             call copyX4(tdump(1,id),soltmp,nxyz)
+          endif
+        enddo
+          
+      else
+        nxyz = nx1*ny1*nz1
 c
-      IF(IFVO)then
-         IF (IE.LE.NELV) then
-            ID=ID+1
-            CALL COPYx4(TDUMP(1,ID),VX(1,1,1,IE),NXYZ)
-            ID=ID+1
-            CALL COPYx4(TDUMP(1,ID),VY(1,1,1,IE),NXYZ)
-            IF(IF3D)then
-               ID=ID+1
-               CALL COPYx4(TDUMP(1,ID),VZ(1,1,1,IE),NXYZ)
-            ENDIF
-         ELSE
-            ID=ID+1
-            CALL RZERO4(TDUMP(1,ID),NXYZ)
-            ID=ID+1
-            CALL RZERO4(TDUMP(1,ID),NXYZ)
-            IF(IF3D)then
-               ID=ID+1
-               CALL RZERO4(TDUMP(1,ID),NXYZ)
-            ENDIF
-         ENDIF
-      ENDIF
-      IF(IFPO)then
-         IF (IE.LE.NELV) then
-            ID=ID+1
-            CALL COPYx4(TDUMP(1,ID),PM1(1,1,1,IE),NXYZ)
-         ELSE
-            ID=ID+1
-            CALL RZERO4(TDUMP(1,ID),NXYZ)
-         ENDIF
-      ENDIF
-      IF(IFTO)then
-         ID=ID+1
-         CALL COPYx4(TDUMP(1,ID),T(1,1,1,IE,1),NXYZ)
-      ENDIF
-C     PASSIVE SCALARS
-      do iip=1,ldimt1
-         if (ifpsco(iip)) then
-            id=id+1
-            call copyX4(tdump(1,id),t(1,1,1,ie,iip+1),nxyz)
-        endif
-      enddo
+        ID=0
+        IF(IFXYO)then
+           ID=ID+1
+           CALL COPYx4(TDUMP(1,ID),XM1(1,1,1,IE),NXYZ)
+           ID=ID+1
+           CALL COPYx4(TDUMP(1,ID),YM1(1,1,1,IE),NXYZ)
+           IF(IF3D) then
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),ZM1(1,1,1,IE),NXYZ)
+           ENDIF
+        ENDIF
+c
+        IF(IFVO)then
+           IF (IE.LE.NELV) then
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),VX(1,1,1,IE),NXYZ)
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),VY(1,1,1,IE),NXYZ)
+              IF(IF3D)then
+                 ID=ID+1
+                 CALL COPYx4(TDUMP(1,ID),VZ(1,1,1,IE),NXYZ)
+              ENDIF
+           ELSE
+              ID=ID+1
+              CALL RZERO4(TDUMP(1,ID),NXYZ)
+              ID=ID+1
+              CALL RZERO4(TDUMP(1,ID),NXYZ)
+              IF(IF3D)then
+                 ID=ID+1
+                 CALL RZERO4(TDUMP(1,ID),NXYZ)
+              ENDIF
+           ENDIF
+        ENDIF
+        IF(IFPO)then
+           IF (IE.LE.NELV) then
+              ID=ID+1
+              CALL COPYx4(TDUMP(1,ID),PM1(1,1,1,IE),NXYZ)
+           ELSE
+              ID=ID+1
+              CALL RZERO4(TDUMP(1,ID),NXYZ)
+           ENDIF
+        ENDIF
+        IF(IFTO)then
+           ID=ID+1
+           CALL COPYx4(TDUMP(1,ID),T(1,1,1,IE,1),NXYZ)
+        ENDIF
+C       PASSIVE SCALARS
+        do iip=1,ldimt1
+           if (ifpsco(iip)) then
+              id=id+1
+              call copyX4(tdump(1,id),t(1,1,1,ie,iip+1),nxyz)
+          endif
+        enddo
+
+      endif
 c
       return
       end
@@ -1328,7 +1407,7 @@ c-----------------------------------------------------------------------
       include 'SIZE'
       include 'TOTAL'
 
-      parameter (lxyz=lx1*ly1*lz1)
+      parameter (lxyz=lx1u*ly1u*lz1u)
       parameter (lpsc9=ldimt1+9)
 
       common /ctmp1/ tdump(lxyz,lpsc9)
@@ -1337,6 +1416,7 @@ c-----------------------------------------------------------------------
       character*11 frmat
 
       nxyz = nx1*ny1*nz1
+      if (ifadapt) nxyz = lx1u*ly1u*lz1u
 
       call blank(frmat,11)
       if (id.le.9) then
@@ -1346,13 +1426,13 @@ c-----------------------------------------------------------------------
          WRITE(FRMAT,1802) ID
  1802    FORMAT('(1p',I2,'e14.6)')
       endif
-
+      
       if (p66.lt.1.0) then
 C       formatted i/o
         WRITE(24,FRMAT)
      $      ((TDUMP(I,II),II=1,ID),I=1,NXYZ)
       else
-C        C binary i/o
+c        C binary i/o
          do ii=1,id
             call byte_write(tdump(1,ii),nxyz,ierr)
             if(ierr.ne.0) goto 101
@@ -1989,6 +2069,7 @@ c restore solution data
       return
       end
 c-----------------------------------------------------------------------
+
       subroutine mfo_mdatav(u,v,w,nel)
 
       include 'SIZE'
@@ -2078,6 +2159,7 @@ c-----------------------------------------------------------------------
       return
       end
 c-----------------------------------------------------------------------
+
       subroutine mfo_mdatas(u,nel)
 
       include 'SIZE'

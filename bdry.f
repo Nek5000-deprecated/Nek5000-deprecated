@@ -337,6 +337,7 @@ C
       character*3 cb
       character*1 cb1(3)
       equivalence (cb1,cb)
+      integer ntot
 c
       logical ifalgn,ifnorx,ifnory,ifnorz
 c
@@ -378,6 +379,10 @@ c        write(6,*) 'MASK ifstrs',ifstrs,ifield
 c        call exitt
          IF (IFSTRS) THEN
            CALL STSMASK (V1MASK,V2MASK,V3MASK)
+           IF (CB.EQ.'ms ') then
+               print *, 'ZEROS V1MASK'
+               CALL FACEV (V1MASK,IEL,IFACE,0.0,NX1,NY1,NZ1)
+           end if
          ELSE
 C
            CALL RONE(V1MASK,NTOT)
@@ -439,29 +444,29 @@ C     k and e if k-e turbulence modem:
 C     k = nfield-1
 C     e = nfield
 C
+
       IF (IFHEAT) THEN
+        DO 1400 IFIELD=2,NFIELD
+           IPSCAL = IFIELD-1
+           NEL    = NELFLD(IFIELD)
+           NTOT   = NXYZ*NEL
+           CALL RONE (TMASK(1,1,1,1,IPSCAL),NTOT)
+        DO 1300 IEL=1,NEL
+        DO 1300 IFACE=1,NFACES
+           CB =CBC(IFACE,IEL,IFIELD)
 C
-         DO 1200 IFIELD=2,NFIELD
-            IPSCAL = IFIELD-1
-            NEL    = NELFLD(IFIELD)
-            NTOT   = NXYZ*NEL
-            CALL RONE (TMASK(1,1,1,1,IPSCAL),NTOT)
-         DO 1100 IEL=1,NEL
-         DO 1100 IFACE=1,NFACES
-            CB =CBC(IFACE,IEL,IFIELD)
+C          Assign mask values.
 C
-C           Assign mask values.
-C
-            IF  (CB.EQ.'T  ' .OR. CB.EQ.'t  ' .OR. 
-     $           CB.EQ.'MCI' .OR. CB.EQ.'MLI' .OR.
-     $           CB.EQ.'KD ' .OR. CB.EQ.'kd ' .OR.
-     $           CB.EQ.'ED ' .OR. CB.EQ.'ed ' .OR.
-     $           CB.EQ.'KW ' .OR. CB.EQ.'KWS' .OR. CB.EQ.'EWS')
-     $           CALL FACEV (TMASK(1,1,1,1,IPSCAL),
-     $                       IEL,IFACE,0.0,NX1,NY1,NZ1)
- 1100       CONTINUE
-         CALL DSOP (TMASK(1,1,1,1,IPSCAL),'MUL',NX1,NY1,NZ1)
- 1200    CONTINUE
+           IF  (CB.EQ.'T  ' .OR. CB.EQ.'t  ' .OR. 
+     $          CB.EQ.'MCI' .OR. CB.EQ.'MLI' .OR.
+     $          CB.EQ.'KD ' .OR. CB.EQ.'kd ' .OR.
+     $          CB.EQ.'ED ' .OR. CB.EQ.'ed ' .OR.
+     $          CB.EQ.'KW ' .OR. CB.EQ.'KWS' .OR. CB.EQ.'EWS')
+     $          CALL FACEV (TMASK(1,1,1,1,IPSCAL),
+     $                      IEL,IFACE,0.0,NX1,NY1,NZ1)
+ 1300      CONTINUE
+        CALL DSOP (TMASK(1,1,1,1,IPSCAL),'MUL',NX1,NY1,NZ1)
+ 1400   CONTINUE
 C
       ENDIF
 C
@@ -786,7 +791,6 @@ C
 
       RETURN
       END
-C
 c-----------------------------------------------------------------------
       SUBROUTINE BCNEUSC(S,ITYPE)
 C
@@ -941,6 +945,7 @@ C
 c
       common  /nekcb/ cb3
       character*3 cb3
+      integer ctr
       cb3 = cb
 
       ifld1 = ifield-1
@@ -952,7 +957,6 @@ C     Passive scalar term
       CALL FACIND (KX1,KX2,KY1,KY2,KZ1,KZ2,NX,NY,NZ,IFACE)
 
       IF (CB.EQ.'t  ') THEN
-
          DO 100 IZ=KZ1,KZ2                           !  11/19/2010: The tmask() screen
          DO 100 IY=KY1,KY2                           !  added here so users can leave
          DO 100 IX=KX1,KX2                           !  certain points to be Neumann,
@@ -1153,39 +1157,80 @@ C       HC            Convection heat transfer coefficient
 C       HRAD          Radiation  heat transfer coefficient
 C       TINF          Temperature at infinity
 C
+C       For adaptive case, IX is the local ptr to the adaptive variables,
+C       IY and IZ are not used, and IEL is still the element number.
+C
       INCLUDE 'SIZE'
       INCLUDE 'GEOM'
       INCLUDE 'SOLN'
       INCLUDE 'INPUT'
       INCLUDE 'TSTEP'
       INCLUDE 'NEKUSE'
+      INCLUDE 'ADAPT'
 c
       common  /nekcb/ cb
       CHARACTER CB*3
 C
       COMMON /SCREV / SII (LX1,LY1,LZ1,LELT)
      $              , SIII(LX1,LY1,LZ1,LELT)
+      integer ptr
 C
-        X     = XM1(IX,IY,IZ,IEL)
-        Y     = YM1(IX,IY,IZ,IEL)
-        Z     = ZM1(IX,IY,IZ,IEL)
-        R     = X**2+Y**2
-        IF (R.GT.0.0) R=SQRT(R)
-        IF (X.NE.0.0 .OR. Y.NE.0.0) THETA = ATAN2(Y,X)
+       if (nx1.ne.lx1) then
+          X     = XM1E(IX) 
+          Y     = YM1E(IX)
+          Z     = ZM1E(IX)
+          R     = X**2+Y**2
+          IF (R.GT.0.0) R=SQRT(R)
+          IF (X.NE.0.0 .OR. Y.NE.0.0) THETA = ATAN2(Y,X)
 C
-        UX    = VX(IX,IY,IZ,IEL)
-        UY    = VY(IX,IY,IZ,IEL)
-        UZ    = VZ(IX,IY,IZ,IEL)
-        TEMP  = T(IX,IY,IZ,IEL,1)
-        DO 100 IPS=1,NPSCAL
-           PS(IPS) = T(IX,IY,IZ,IEL,IPS+1)
- 100    CONTINUE
-        SI2   = SII (IX,IY,IZ,IEL)
-        SI3   = SIII(IX,IY,IZ,IEL)
-        UDIFF = VDIFF (IX,IY,IZ,IEL,IFIELD)
-        UTRANS= VTRANS(IX,IY,IZ,IEL,IFIELD)
+          ! Without interpolating, these velocity values are incorrect
+          ! (unless this element has nx1 = lx1)
+          UX    = VXA(IX) 
+          UY    = VYA(IX)
+          UZ    = VZA(IX)
+          ptr = adptr(iel,2)+IX-1
+          TEMP  = Tad(ptr)
+          DO 90 IPS=1,NPSCAL
+             ptr = adptr(iel,2+IPS)+IX-1
+             PS(IPS) = Tad(ptr)
+ 90       CONTINUE
+          SI2   = SII (IX,IY,IZ,IEL)
+          SI3   = SIII(IX,IY,IZ,IEL)
+          ptr = adptr(iel,ifield)+IX-1
+          if (ifield.ne.1) ptr = ptr+ntota(1)
+          UDIFF = VDIFFA (ptr)
+          UTRANS= VTRANSA(ptr)
+          
+          !X     = XM1A(ptr)   
+          !Y     = YM1A(ptr)
+          !Z     = ZM1A(ptr)
+          !R     = X**2+Y**2
+          !IF (R.GT.0.0) R=SQRT(R)
+          !IF (X.NE.0.0 .OR. Y.NE.0.0) THETA = ATAN2(Y,X)
 c
-        cbu   = cb
+          cbu   = cb
+       else
+          X     = XM1(IX,IY,IZ,IEL)
+          Y     = YM1(IX,IY,IZ,IEL)
+          Z     = ZM1(IX,IY,IZ,IEL)
+          R     = X**2+Y**2
+          IF (R.GT.0.0) R=SQRT(R)
+          IF (X.NE.0.0 .OR. Y.NE.0.0) THETA = ATAN2(Y,X)
+C
+          UX    = VX(IX,IY,IZ,IEL)
+          UY    = VY(IX,IY,IZ,IEL)
+          UZ    = VZ(IX,IY,IZ,IEL)
+          TEMP  = T(IX,IY,IZ,IEL,1)
+          DO 100 IPS=1,NPSCAL
+             PS(IPS) = T(IX,IY,IZ,IEL,IPS+1)
+ 100      CONTINUE
+          SI2   = SII (IX,IY,IZ,IEL)
+          SI3   = SIII(IX,IY,IZ,IEL)
+          UDIFF = VDIFF (IX,IY,IZ,IEL,IFIELD)
+          UTRANS= VTRANS(IX,IY,IZ,IEL,IFIELD)
+c
+          cbu   = cb
+       end if
 C
       RETURN
       END
@@ -1267,6 +1312,9 @@ C
              IF (CB.EQ.'ms '.or.cb.eq.'mm ') THEN
                 CALL FACEIV  (CB,TRX,TRY,TRZ,IEL,IFC,NX1,NY1,NZ1)
                 CALL FACCVS  (TRX,TRY,TRZ,AREA(1,1,IFC,IEL),IFC)
+C                ! Zero normal stress contribution
+C                CALL RZERO(TRX,)
+
                 CALL GLOBROT (TRX,TRY,TRZ,IEL,IFC)
              ENDIF
              IF (CB(1:1).EQ.'M') THEN

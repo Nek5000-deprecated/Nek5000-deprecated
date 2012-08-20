@@ -28,7 +28,7 @@ c
      $ ,             YM3 (LX3,LY3,LZ3,LELT)
      $ ,             ZM3 (LX3,LY3,LZ3,LELT)
 C
-      common /c_is1/ glo_num(1*lx1*ly1*lz1*lelv)
+      common /c_is1/ glo_num(1*lx1u*ly1u*lz1u*lelv)    ! KED
       integer*8 glo_num
       common /ivrtx/ vertex ((2**ldim)*lelt)
       integer vertex
@@ -132,8 +132,7 @@ C========================================================================
       ntotv = nx1*ny1*nz1*nelv
       ntott = nx1*ny1*nz1*nelt
 
-
-
+     
       if (ifflow) then
          ifield = 1
          call rone    (vmult,ntotv)
@@ -1794,7 +1793,7 @@ c-----------------------------------------------------------------------
       include 'NONCON'
       include 'ZPER'
 
-      common /c_is1/ glo_num(1*lx1*ly1*lz1*lelv)
+      common /c_is1/ glo_num(1*lx1u*ly1u*lz1u*lelv)
       integer*8 glo_num
       common /ivrtx/ vertex ((2**ldim)*lelt)
       integer vertex

@@ -1,3 +1,4 @@
+      include 'ADAPT'
       include 'DXYZ'
       include 'DEALIAS'
       include 'EIGEN'

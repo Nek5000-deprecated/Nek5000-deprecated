@@ -68,10 +68,10 @@ c     Check for zero steps
       instep=1
       if (nsteps.eq.0 .and. fintim.eq.0.) instep=0
 
-C     Setup domain topology  
+C     Setup domain topology 
       igeom = 2
       call setup_topo
-
+      
 C     Compute GLL stuff (points, weights, derivate op, ...)
       call genwz
 
@@ -149,6 +149,10 @@ C     Initialize CVODE
       call sstest (isss) 
 
       call dofcnt
+      
+      if (lx1u.ne.lx1) ifadapt = .true. ! KED  : only check nx1 for now
+      ifadapt = .true.
+      if (ifadapt) call adinit
 
       jp = 0  ! Set perturbation field count to 0 for baseline flow
 
@@ -176,9 +180,10 @@ c-----------------------------------------------------------------------
       include 'TSTEP'
       include 'INPUT'
       include 'CTIMER'
+      include 'ADAPT'
 
       real*4 papi_mflops
-      integer*8 papi_flops
+      integer*8 papi_flops,ierr
 
       call nekgsync()
 
@@ -212,9 +217,9 @@ c-----------------------------------------------------------------------
          call userchk
          call prepost (.false.,'his')
          if (lastep .eq. 1) goto 1001
+         if (ifadapt) call padapt    ! KED
       ENDDO
  1001 lastep=1
-
 
       call nek_comm_settings(isyc,0)
 
@@ -266,7 +271,7 @@ c-----------------------------------------------------------------------
          if (param(103).gt.0) call q_filter(param(103))
          call setup_convect (2) ! Save convective velocity _after_ filter
 
-      else                ! PN-2/PN-2 formulation
+      else                ! PN/PN-2 formulation
 
          call setprop
          do igeom=1,ngeom

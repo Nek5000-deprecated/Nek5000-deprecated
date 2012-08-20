@@ -1,0 +1,79 @@
+C     KED
+C 
+C      parameter (tmpdim = max(ldimt1,(lorder-1)*ldimt,2) )
+C      parameter (lorder2 = max(1,lorder-2) )
+    
+      COMMON /ADSOLN/ VXA(LX1U*LY1U*LZ1U*LELV),
+     $                VYA(LX1U*LY1U*LZ1U*LELV),
+     $                VZA(LX1U*LY1U*LZ1U*LELV),
+     $                VXLAGA(LX1U*LY1U*LZ1U*LELV*2),
+     $                VYLAGA(LX1U*LY1U*LZ1U*LELV*2),
+     $                VZLAGA(LX1U*LY1U*LZ1U*LELV*2),
+     $                TAD(LX1U*LY1U*LZ1U*LELT*LDIMT),
+     $                TLAGA(LX1U*LY1U*LZ1U*LELT*(LORDER-1)*LDIMT),
+     $                VTRANSA(LX1U*LY1U*LZ1U*LELT*LDIMT1),
+     $                VDIFFA(LX1U*LY1U*LZ1U*LELT*LDIMT1),
+     $                SOLTMP(LX1U*LY1U*LZ1U*LELT*(LORDER-1)*LDIMT),
+     $                SOLTMPB(LX1U*LZ1U*LELT*LDIMT1*6),
+     $                BQA(LX1U*LY1U*LZ1U*LELT*LDIMT),
+     $                VGRADT1A(LX1U*LY1U*LZ1U*LELT*LDIMT),
+     $                VGRADT2A(LX1U*LY1U*LZ1U*LELT*LDIMT)
+C     $                PRA(LX1U*LY1U*LZ1U*LELT),
+C     $                PRLAGA(LX1U*LY1U*LZ1U*LELT*LORDER2)
+
+      COMMON /ADMASK/ V1MASKA(LX1U*LY1U*LZ1U*LELV),
+     $                V2MASKA(LX1U*LY1U*LZ1U*LELV),
+     $                V3MASKA(LX1U*LY1U*LZ1U*LELV),
+     $                TMASKA(LX1U*LY1U*LZ1U*LELT*LDIMT),
+     $                VMULTA(LX1U*LY1U*LZ1U*LELV),
+     $                TMULTA(LX1U*LY1U*LZ1U*LELT*LDIMT)
+C
+      COMMON /LOCGEO/ BM1A(LX1U*LY1U*LZ1U*LELT*LDIMT1),
+     $                BINVM1A(LX1U*LY1U*LZ1U*LELT*LDIMT1),
+     $                GM1A(LX1U*LY1U*LZ1U*6),
+     $                WXM1E(LX1U),WYM1E(LY1U),WZM1E(LZ1U),
+     $                W3M1E(LX1U*LY1U*LZ1U),DXM1E(LX1U*LX1U),
+     $                DXTM1E(LX1U*LX1U),DYM1E(LY1U*LY1U),
+     $                DYTM1E(LY1U*LY1U),DZM1E(LZ1U*LZ1U),
+     $                DZTM1E(LZ1U*LZ1U),XM1E(LX1U*LY1U*LZ1U),
+     $                YM1E(LX1U*LY1U*LZ1U),ZM1E(LX1U*LY1U*LZ1U),
+     $                AREAA(LX1U*LZ1U*6*LELT*LDIMT1),
+     $                RXM1E(LX1U*LY1U*LZ1U),RYM1E(LX1U*LY1U*LZ1U),
+     $                RZM1E(LX1U*LY1U*LZ1U),SXM1E(LX1U*LY1U*LZ1U),
+     $                SYM1E(LX1U*LY1U*LZ1U),SZM1E(LX1U*LY1U*LZ1U),
+     $                TXM1E(LX1U*LY1U*LZ1U),TYM1E(LX1U*LY1U*LZ1U),
+     $                TZM1E(LX1U*LY1U*LZ1U),JACM1E(LX1U*LY1U*LZ1U),
+     $                JACMIE(LX1U*LY1U*LZ1U),XM1A(LX1U*LY1U*LZ1U*LELT),
+     $                YM1A(LX1U*LY1U*LZ1U*LELT),
+     $                ZM1A(LX1U*LY1U*LZ1U*LELT),DRSTUI(LX1U,LX1U)
+
+      COMMON /PTRS/ ADPTR(LELT,LDIMT1),ADPTR1(LELT,LDIMT1),
+     $              NEWPTR(LELT,LDIMT1),NEWPTR1(LELT,LDIMT1),
+     $              ADMORTAR(2*LDIM,LELT,LDIMT1),
+     $              NTOTA(ldimt1),NEWNTOTA(LDIMT1),ADINC,
+     $              BPTR(LELT,LDIMT1),NEWBPTR(LELT,LDIMT1)
+C
+      COMMON /NPVAR/ NX1VAR(LELT,LDIMT1),NY1VAR(LELT,LDIMT1),
+     $               NZ1VAR(LELT,LDIMT1),NXDVAR(LELT,LDIMT1),
+     $               NYDVAR(LELT,LDIMT1),NZDVAR(LELT,LDIMT1),
+     $               ADORDS(3,3,3,LELT,LDIMT1),MAXORD(LDIMT1),
+     $               MINORD(LDIMT1)
+
+      COMMON /INEW/ IXADPT(LX1U*LX1U),IYADPT(LY1U*LY1U), 
+     $              IZADPT(LZ1U*LZ1U),IXTADPT(LX1U*LX1U),
+     $              IYTADPT(LY1U*LY1U),IZTADPT(LZ1U*LZ1U)
+      
+      COMMON /ADFLAGS/ ADAPTFLAG(LELT,LDIMT1),ADAPTFLD(ldimt1),
+     $                 ADAPTANY,IFADAPT
+
+      COMMON /DEBUG/ debug
+C
+      REAL VXA,VYA,VZA,VXLAGA,VYLAGA,VZLAGA,TAD,TLAGA,VTRANSA,VDIFFA,
+     $     SOLTMP,SOLTMPB,BM1A,GM1A,IXADPT,IYADPT,IZADPT,IXTADPT,
+     $     IYTADPT,IZTADPT,V1MASKA,V2MASKA,V3MASKA,TMASKA,VMULTA,TMULTA,
+     $     BQA,AREAA,RXM1E,RYM1E,RZM1E,SXM1E,SYM1E,SZM1E,TXM1E,TYM1E,
+     $     TZM1E,JACM1E,JACMIE,XM1A,YM1A,ZM1A,DRSTUI
+      INTEGER  ADPTR,ADPTR1,ADMORTAR,NTOTA,NX1VAR,
+     $         NY1VAR,NZ1VAR,NXDVAR,NYDVAR,NZDVAR,ADINC,MAXORD,MINORD,
+     $         BPTR,NEWBPTR
+      LOGICAL  IFADAPT,ADAPTFLAG,ADAPTFLD,ADAPTANY,debug

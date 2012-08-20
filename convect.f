@@ -683,24 +683,26 @@ C
 
       integer e
 
-      call set_dealias_rx
+      call set_dealias_rx 
 
+      lxyz1 = lx1*ly1*lz1
       nxyz1 = nx1*ny1*nz1
       nxyzd = nxd*nyd*nzd
 
       nxyzu = nxyz1
       if (ifuf) nxyzu = nxyzd
 
-      nxyzc = nxyz1
+      nxyzc = lxyz1
       if (ifcf) nxyzc = nxyzd
 
       iu = 1    ! pointer to scalar field u
       ic = 1    ! pointer to vector field C
       ib = 1    ! pointer to scalar field Bdu
 
-
       do e=1,nelv
 
+         !if (ifadapt) call getord(e,1)  ! resets velocity order
+         
          if (ifcf) then
 
             call copy(tr(1,1),cx(ic),nxyzd)  ! already in rst form
@@ -708,10 +710,9 @@ C
             if (if3d) call copy(tr(1,3),cz(ic),nxyzd)
 
          else  ! map coarse velocity to fine mesh (C-->F)
-
-           call intp_rstd(fx,cx(ic),nx1,nxd,if3d,0) ! 0 --> forward
-           call intp_rstd(fy,cy(ic),nx1,nxd,if3d,0) ! 0 --> forward
-           if (if3d) call intp_rstd(fz,cz(ic),nx1,nxd,if3d,0) ! 0 --> forward
+           call intp_rstd(fx,cx(ic),lx1,nxd,if3d,0) ! 0 --> forward
+           call intp_rstd(fy,cy(ic),lx1,nxd,if3d,0) ! 0 --> forward
+           if (if3d) call intp_rstd(fz,cz(ic),lx1,nxd,if3d,0) ! 0 --> forward
 
            if (if3d) then  ! Convert convector F to r-s-t coordinates
 
@@ -731,7 +732,12 @@ C
            endif
 
          endif
-
+         
+         if (ifadapt) then
+           call getord(e,ifield)
+           nxyzu = nx1*ny1*nz1
+         end if
+     
          if (ifuf) then
             call grad_rst(ur,us,ut,u(iu),nxd,if3d)
          else
@@ -753,7 +759,7 @@ C
          ic = ic + nxyzc
          iu = iu + nxyzu
          ib = ib + nxyz1
-
+         
       enddo
 
       return
@@ -894,6 +900,7 @@ C
       integer e
 
       call set_dealias_rx
+
 
       nxyz1 = nx1*ny1*nz1
       nxyzd = nxd*nyd*nzd

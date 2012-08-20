@@ -285,7 +285,7 @@ c
 c     Input:  U     := (ux,uy,uz)
 c
 c     Output: updated values of U, iproj, proj; and
-c             up    := pressure currection req'd to impose div U = 0
+c             up    := pressure correction req'd to impose div U = 0
 c
 c
 c     Dependencies: ifield ==> which "density" (vtrans) is used.
@@ -921,6 +921,7 @@ c
       include 'GEOM'
       include 'INPUT'
       include 'WZ'
+      include 'ADAPT'
 c
       real u(nx1,ny1,nz1,nelv),v(nx1,ny1,nz1,nelv),w(nx1,ny1,nz1,nelv)
 c
@@ -934,6 +935,7 @@ c
       save    icalld
       data    icalld /0/
 c
+      if (ifadapt) call getord(1,1)   ! For now
       if (icalld.eq.0) then
          icalld=1
          call getdr(dri,zgm1(1,1),nx1)

@@ -701,7 +701,7 @@ C
       SUBROUTINE SETTOLT
 C-------------------------------------------------------------------
 C
-C     Set tolerances for temerature/passive scalar solver
+C     Set tolerances for temperature/passive scalar solver
 C
 C-------------------------------------------------------------------
       INCLUDE 'SIZE'
@@ -710,10 +710,18 @@ C-------------------------------------------------------------------
       INCLUDE 'MASS'
       INCLUDE 'TSTEP'
       INCLUDE 'SOLN'
+      INCLUDE 'ADAPT'
       REAL LENGTH
+      integer ptr
 C
-      NTOT   = NX1*NY1*NZ1*NELFLD(IFIELD)
-      AVCOND = GLMIN (VDIFF(1,1,1,1,IFIELD),NTOT)
+      if (ifadapt) then
+        ntot = ntota(ifield) 
+        ptr = adptr(1,ifield)
+        avcond = glmin(vdiffa(ptr),ntot)
+      else 
+        NTOT   = NX1*NY1*NZ1*NELFLD(IFIELD)
+        AVCOND = GLMIN (VDIFF(1,1,1,1,IFIELD),NTOT)
+      end if
 C
       IF (IFTRAN) THEN
          IF (ISTEP.EQ.1)  TNORM = TNRML8(IFIELD-1)

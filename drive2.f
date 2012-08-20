@@ -6,7 +6,7 @@ C
 C-------------------------------------------------------------------
       include 'SIZE'
       include 'INPUT'
-C
+
       NX1=LX1
       NY1=LY1
       NZ1=LZ1
@@ -22,12 +22,13 @@ C
       NXD=LXD
       NYD=LYD
       NZD=LZD
-
+      
 C
       NELT=LELT
       NELV=LELV
       NDIM=LDIM
 C
+      
       RETURN
       END
 C
@@ -51,6 +52,8 @@ c     Set default logicals
 
       ifsplit = .false.
       if (lx1.eq.lx2) ifsplit=.true.
+      
+      ifadapt = .false.
 
       if_full_pres = .false.
 
@@ -153,6 +156,7 @@ C------------------------------------------------------------------------
       include 'GEOM'
       include 'DEALIAS'
       include 'TSTEP'
+      include 'ADAPT'
 C
 C     Enforce splitting/Uzawa according to the way the code was compiled
 C
@@ -304,6 +308,27 @@ C     Initialize time step array.
 C
       NBD    = 0
       CALL RZERO (DTLAG,10)
+
+C     ! Initialize arrays used for p-adaptivity
+      if (ifadapt) then
+        call izero(admortar,2*ldim*lelt*ldimt1)
+        call ifill(nx1var,nx1,lelt*ldimt1)
+        call ifill(ny1var,nx1,lelt*ldimt1)
+        call ifill(nz1var,nx1,lelt*ldimt1)
+        nxyz = nx1*ny1*nz1
+        do j=1,ldmit1
+          do i=1,lelt
+            adptr1(i,j) = (i-1)*nxyz+1
+          end do
+        end do
+        call icopy(adptr(1,1),adptr1(1,1),2*lelt)
+        if (ldimt1>2) then
+          do i=2*lelt+1,lelt*(ldimt1-2)
+            adptr(i,1) = adptr(i-1,1)+nxyz
+          end do 
+        end if
+      end if
+
 C
 C     Useful constants
 C
@@ -733,6 +758,7 @@ C-----------------------------------------------------------------------
  
       ifield = 1
       imesh  = 1
+
       call unorm
       call settolv
 
@@ -757,7 +783,6 @@ c                - Incompressibe or Weakly compressible (div u .ne. 0).
       elseif (iftran) then
 
 c        call plan1 (igeom)       !  Orig. NEKTON time stepper
-
          call plan3 (igeom)       !  Same as PLAN 1 w/o nested iteration
                                   !  Std. NEKTON time stepper  !
 
@@ -788,12 +813,12 @@ C
 C     Driver for temperature or passive scalar.
 C
 C     Current version:
-C     (1) Varaiable properties.
+C     (1) Variable properties.
 C     (2) Implicit time stepping.
 C     (3) User specified tolerance for the Helmholtz solver
 C         (not based on eigenvalues).
 C     (4) A passive scalar can be defined on either the 
-C         temperatur or the velocity mesh.
+C         temperature or the velocity mesh.
 C     (5) A passive scalar has its own multiplicity (B.C.).  
 C
       include 'SIZE'
@@ -801,6 +826,7 @@ C
       include 'TSTEP'
       include 'TURBO' 
       include 'DEALIAS'
+      include 'ADAPT'
 
       real*8 ts, dnekclock
 
@@ -823,7 +849,11 @@ C
             if (     iftmsh(ifield)) imesh = 2
             call unorm
             call settolt
-            call cdscal (igeo)
+            if (ifadapt) then
+              call cdscala(igeom)
+            else
+              call cdscal (igeom)
+            end if
          enddo
          enddo
          igeom = 2
@@ -836,7 +866,12 @@ C
             if (     iftmsh(ifield)) imesh = 2
             call unorm
             call settolt
-            call cdscal (igeom)
+ 
+            if (ifadapt) then
+              call cdscala(igeom)
+            else
+              call cdscal (igeom)
+            end if
          enddo
 
       endif

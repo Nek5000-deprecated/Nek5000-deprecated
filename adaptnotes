@@ -1,0 +1,28 @@
+TO DO
+
+change user input so that it works for the adaptive case 
+   userbc currently works for scalars on an adaptive grid
+
+handle AREA appropriately - let flux = 0 for now 
+ 
+test the error calculator at higher orders - which metric is best?
+Also, do we allow the order to drop for elements where very little
+is happening?
+
+successfully compile with -O2
+
+look at dssum routines that contain apply_J and apply_Jt
+
+make a new setvert routine for assembling glo_num
+   - compute correctly the number of unique edge nodes in navier8.f, setvert2d.
+
+make velocity/pressure adaptive
+
+NOTES
+
+The convective term uses the velocity grid geometric data rather than calling
+ComputeG to get the temperature grid geometric data. (This refers to the routine
+convect.f -> convect_new -> set_dealias_rx.) Do we need the higher order geometric
+data of the scalar field since velocity is projected from the lower order grid
+(unless the adaption increment is negative)?
+

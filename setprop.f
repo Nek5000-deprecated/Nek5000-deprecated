@@ -12,6 +12,7 @@ C     Caution: 2nd and 3rd strainrate invariants residing in scratch
 C              common /SCREV/ are used in STNRINV and NEKASGN
 C
       common /screv/ sii (lx1,ly1,lz1,lelt),siii(lx1,ly1,lz1,lelt)
+      integer offset,ptr
 
 #ifndef NOTIMER
       if (icalld.eq.0) tspro=0.0
@@ -33,12 +34,22 @@ C
 
          CALL VPROPS
 
+       if (ifadapt) then
+           ntot1 =  ntota(IFIELD)
+           ptr = adptr(1,ifield)
+           if (ifield.ne.1) ptr = ptr+ntota(1)
+         avdiff(ifield) = glsc2 (bm1a(ptr),vdiffa(ptr),
+     $                           ntot1)/vol
+         avtran(ifield) = glsc2 (bm1a(ptr),vtransa(ptr),
+     $                           ntot1)/vol
+         
+        else 
          nel = nelfld(ifield)
          vol = volfld(ifield)
          ntot1 = nxyz1*nel
-
          avdiff(ifield) = glsc2 (bm1,vdiff (1,1,1,1,ifield),ntot1)/vol
          avtran(ifield) = glsc2 (bm1,vtrans(1,1,1,1,ifield),ntot1)/vol
+        endif
 
       ENDDO
 
