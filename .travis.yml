@@ -19,6 +19,9 @@ before_install:
  - sudo apt-get install -y gfortran 
  - git clone https://github.com/maxhutch/nek-tests.git
  - git clone https://github.com/maxhutch/nek-tools.git
+ - cd nek-tools
+ - ./maketools genbox genmap
+ - cd ..
  - cd nek-tests/$(dirname "$TEST_SUITE")
 
 install:
