@@ -20,7 +20,8 @@ before_install:
  - git clone https://github.com/maxhutch/nek-tests.git
  - git clone https://github.com/maxhutch/nek-tools.git
  - cd nek-tools
- - ./maketools genbox genmap
+ - ./maketools genmap
+ - ./maketools genbox 
  - cd ..
  - cd nek-tests/$(dirname "$TEST_SUITE")
 
