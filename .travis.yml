@@ -8,7 +8,6 @@ env:
  - TEST_SUITE=Hill/Hill
  - TEST_SUITE=lid/lid
  - TEST_SUITE=iturb/iturb
- - TEST_SUITE=iturb/iturb_courant
 
 before_install: 
  - export ROOT_DIR=`pwd`
