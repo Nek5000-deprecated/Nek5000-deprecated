@@ -7,7 +7,7 @@ SOURCE_ROOT="$HOME/nek5_svn/trunk/nek"
 SOURCE_ROOT2="$SOURCE_ROOT/cmt" 
 
 # Fortran compiler
-F77="mpif77"
+F77="mpif77 -mcmodel=medium"
 
 # C compiler
 CC="mpicc"
