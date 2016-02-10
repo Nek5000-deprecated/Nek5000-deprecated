@@ -1,0 +1,48 @@
+language: fortran
+
+env:
+ - TEST_SUITE=RTI-LST/LST
+ - TEST_SUITE=RTI-LST/LST_all
+ - TEST_SUITE=RTI-LST/LST_sym
+ - TEST_SUITE=RTI-LST/LST_sym_half
+ - TEST_SUITE=Hill/Hill
+ - TEST_SUITE=lid/lid
+ - TEST_SUITE=iturb/iturb
+
+before_install: 
+ - export ROOT_DIR=`pwd`
+ - sudo apt-get update -qq
+ - sudo apt-get install -y mpich2 libmpich2-dev 
+ - sudo apt-get install -y liblapack-dev
+ - sudo apt-get install -y fftw3-dev
+ - sudo apt-get install -y gfortran 
+ - git clone https://github.com/maxhutch/nek-tests.git
+ - git clone https://github.com/maxhutch/nek-tools.git
+ - cd nek-tools
+ - ./maketools genmap
+ - ./maketools genbox 
+ - cd ..
+ - cd nek-tests/$(dirname "$TEST_SUITE")
+
+install:
+ - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+ - bash miniconda.sh -b -p $HOME/miniconda
+ - export PATH="$HOME/miniconda/bin:$PATH"
+ - hash -r
+ - conda config --set always_yes yes --set changeps1 no
+ - conda update -q conda
+ - conda info -a
+ - conda create -q -n test-environment python=3.4 numpy
+ - source activate test-environment
+
+before_script: 
+ - python ../../nek-tools/genrun/genrun.py -u *_f77.tusr -d $(basename "$TEST_SUITE").json --legacy --makenek=../../makenek test
+# - ../../makenek RTI_LST $ROOT_DIR
+
+script: 
+ - set -o pipefail
+ - sh ../../nekmpi test 4 |tee test.out
+ - grep "Max" test.out > test.grp
+ - grep "Max" $(basename "$TEST_SUITE")_ref.out > ref.grp
+ - python3 ../ndiff.py test.grp ref.grp
+
