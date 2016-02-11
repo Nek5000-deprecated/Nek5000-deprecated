@@ -1048,7 +1048,7 @@ C
  
       mtmp        = param(93)
       do i=1,2*ndim
-         ivproj(1,i) = min(mxprev,mtmp) - 1
+         ivproj(1,i) = min(mxprev,mtmp) 
       enddo
  
       imesh = 1
@@ -1062,25 +1062,25 @@ C
          if (ifield.eq.1) then
             call hsolve ('velx',o1,i1,h1,h2,v1mask,vmult
      $                   ,imesh,tolh,nmxhi,1
-     $                   ,vproj(1,1),h_approx(1,1,1),ivproj(1,1),binvm1)
+     $                   ,vproj(1,1),h_approx(1,1),ivproj(1,1),binvm1)
             call hsolve ('vely',o2,i2,h1,h2,v2mask,vmult
      $                   ,imesh,tolh,nmxhi,2
-     $                   ,vproj(1,2),h_approx(1,1,2),ivproj(1,2),binvm1)
+     $                   ,vproj(1,2),h_approx(1,2),ivproj(1,2),binvm1)
             if (if3d)
      $      call hsolve ('velz',o3,i3,h1,h2,v3mask,vmult
      $                   ,imesh,tolh,nmxhi,3
-     $                   ,vproj(1,3),h_approx(1,1,3),ivproj(1,3),binvm1)
+     $                   ,vproj(1,3),h_approx(1,3),ivproj(1,3),binvm1)
          else  ! B-field
             call hsolve (' Bx ',o1,i1,h1,h2,b1mask,vmult
      $                   ,imesh,tolh,nmxhi,1
-     $                   ,vproj(1,4),h_approx(1,1,4),ivproj(1,4),binvm1)
+     $                   ,vproj(1,4),h_approx(1,4),ivproj(1,4),binvm1)
             call hsolve (' By ',o2,i2,h1,h2,b2mask,vmult
      $                   ,imesh,tolh,nmxhi,2
-     $                   ,vproj(1,5),h_approx(1,1,5),ivproj(1,5),binvm1)
+     $                   ,vproj(1,5),h_approx(1,5),ivproj(1,5),binvm1)
             if (if3d)
      $      call hsolve (' Bz ',o3,i3,h1,h2,b3mask,vmult
      $                   ,imesh,tolh,nmxhi,3
-     $                   ,vproj(1,6),h_approx(1,1,6),ivproj(1,6),binvm1)
+     $                   ,vproj(1,6),h_approx(1,6),ivproj(1,6),binvm1)
          endif
       endif
 C

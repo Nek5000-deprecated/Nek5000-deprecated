@@ -529,7 +529,7 @@ c
         enddo
       enddo
       call dsyev('V', 'U', napprox(2), 
-     $           tmp_mat, napprox(1),
+     $           tmp_mat, mxprev,
      $           tmp_vec,
      $           wl, ntot, ierr)
       call col3    (wl, r, vml, ntot)

@@ -3,7 +3,7 @@
 c
       common /prthoi/ napprox(4)
       common /orthov/ approx(ktot,0:laxt)
-      common /orthoh/ h_approx(laxt, laxt)
+      common /orthoh/ h_approx(laxt*laxt)
       common /prthoc/ name4
       character*4     name4
 
