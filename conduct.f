@@ -86,13 +86,13 @@ c    $                 ,IMESH,TOLHT(IFIELD),NMXH,isd)
      $                   ,tmask(1,1,1,1,ifield-1)
      $                   ,tmult(1,1,1,1,ifield-1)
      $                   ,imesh,tolht(ifield),nmxh,1
-     $                   ,approx,napprox,bintm1)
+     $                   ,approx,h_approx,napprox,bintm1)
          else
            call hsolve  (name4,TA,TB,H1,H2 
      $                   ,tmask(1,1,1,1,ifield-1)
      $                   ,tmult(1,1,1,1,ifield-1)
      $                   ,imesh,tolht(ifield),nmxh,1
-     $                   ,approx,napprox,binvm1)
+     $                   ,approx,h_approx,napprox,binvm1)
          endif 
 
          call add2    (t(1,1,1,1,ifield-1),ta,n)
