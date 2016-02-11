@@ -4,7 +4,7 @@ c
 c     parameter (ktot = 1)
 c     parameter (laxt = 1)
 c
-      common /trthoi/ napprox(3)
+      common /trthoi/ napprox(4)
       common /trthov/ approx(ktot,0:laxt)
       common /trthoh/ h_approx(laxt, laxt)
       common /trthoc/ name4

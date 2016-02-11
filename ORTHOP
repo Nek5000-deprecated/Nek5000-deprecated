@@ -1,7 +1,7 @@
       parameter (ktot = lx1*ly1*lz1*lelt)
       parameter (laxt = mxprev)
 c
-      common /prthoi/ napprox(3)
+      common /prthoi/ napprox(4)
       common /orthov/ approx(ktot,0:laxt)
       common /orthoh/ h_approx(laxt, laxt)
       common /prthoc/ name4

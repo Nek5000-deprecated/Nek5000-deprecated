@@ -686,24 +686,24 @@ c
       real    dtold
       save    dtold
       data    dtold/0.0/
+
+      real hash
+      integer hash_int
+      equivalence (hash, hash_int)
+
 c
 c     First, we have to decide if the dt has changed.
 c
       ifupdate = .false.
-      if (dt.ne.dtold) then
-         dtold    = dt
-         name_old = name4
-         ifnewdt  = .true.
-         ifupdate = .true.
-      elseif (ifnewdt) then
-         if (name4.eq.name_old) then
-            ifnewdt = .false.
-         else
-            ifupdate = .true.
-         endif
+      hash = 0.
+      do i = 1, lt
+        hash = hash + h1(i)**(mod(i, 3) + 1)
+        hash = hash + h2(i)**(mod(i, 3) + 1)
+      enddo
+      if (hash_int /= napprox(4)) then
+        ifupdate = .true.
       endif
-      if (ifvarp(ifield)) ifupdate = .true.
-      if (iflomach)       ifupdate = .true.
+      napprox(4) = hash_int
 
       if (ifupdate) then    ! reorthogonalize 
          n_sav = napprox(2)
