@@ -68,7 +68,7 @@ C     first, compute pressure
       call hsolve   ('PRES',dpr,respr,h1,h2 
      $                     ,pmask,vmult
      $                     ,imesh,tolspl,nmxh,1
-     $                     ,approx,napprox,binvm1)
+     $                     ,approx,h_approx,napprox,binvm1)
       call add2    (pr,dpr,ntot1)
       call ortho   (pr)
       tpres=tpres+(dnekclock()-etime1)

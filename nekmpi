@@ -1,0 +1,14 @@
+# Check if we need to change dirs
+if [ -n "$3" ]
+  then
+  cd $3
+fi
+echo $1        >  SESSION.NAME
+echo `pwd`'/' >>  SESSION.NAME
+ls
+touch $1.rea
+rm -f logfile
+rm -f ioinfo
+mv $1.log.$2 $1.log1.$2
+mv $1.sch $1.sch1
+mpiexec -np $2 ./nek5000

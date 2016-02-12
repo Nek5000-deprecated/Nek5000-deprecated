@@ -468,7 +468,8 @@ C
 c-----------------------------------------------------------------------
 c     THE ROUTINES BELOW ARE THE NEW Helmholtz projectors
 c-----------------------------------------------------------------------
-      subroutine projh(r,h1,h2,bi,vml,vmk,approx,napprox,wl,ws,name4)
+      subroutine projh(r,h1,h2,bi,vml,vmk,
+     $                 approx,h_approx,napprox,wl,ws,name4)
 C
 C     Orthogonalize the rhs wrt previous rhs's for which we already
 C     know the soln.
@@ -487,6 +488,7 @@ c
       include 'MASS'
       include 'SOLN'
       include 'TSTEP'
+      common /newnewproj/ tmp_mat(mxprev,mxprev), tmp_vec(mxprev)
 c
       parameter(lt=lx1*ly1*lz1*lelt)
 C
@@ -494,8 +496,11 @@ C
       real bi(1)
       real wl(1),ws(1)
       real approx(lt,0:1)
-      integer napprox(2)
+      integer napprox(3)
+      real h_approx(napprox(1), napprox(1))
       character*4 name4
+      real zero, one
+      parameter (zero = 0., one = 1.)
 c
       n_max = napprox(1)
       n_sav = napprox(2)
@@ -512,20 +517,42 @@ c
       if (alpha1.gt.0) alpha1 = sqrt(alpha1/vol)
 c
 c     Update approximation space if dt has changed
-      call updrhsh(approx,napprox,h1,h2,vml,vmk,ws,name4)
+      call updrhsh(approx,h_approx,napprox,h1,h2,vml,vmk,ws,name4)
 c
 c
 c     Perform Gram-Schmidt for previous soln's
 c
-      do i=1,n_sav
-         ws(i) = vlsc3(r,approx(1,i),vml,ntot)
+
+      do i = 1, napprox(2)
+        do j = 1, napprox(2)
+          tmp_mat(i,j) = h_approx(i,j)
+        enddo
       enddo
-      call gop    (ws,ws(n_sav+1),'+  ',n_sav)
-c
-      call cmult2   (approx(1,0),approx(1,1),ws(1),ntot)
-      do i=2,n_sav
-         call add2s2(approx(1,0),approx(1,i),ws(i),ntot)
+      call dsyev('V', 'U', napprox(2), 
+     $           tmp_mat, mxprev,
+     $           tmp_vec,
+     $           wl, ntot, ierr)
+      call col3    (wl, r, vml, ntot)
+      call dgemv('T', ntot, napprox(2), 
+     $           one,  approx(1,1), ntot,
+     $                 wl, 1,
+     $           zero, ws, 1)
+      call gop(ws, ws(1+napprox(2)), '+  ', napprox(2))
+      do i = 1, napprox(2)
+        call col3(wl, tmp_mat(1,i), ws, napprox(2))
+        tmp_vec(i) = vlsum(wl, napprox(2)) / tmp_vec(i)
       enddo
+      do i = 1, napprox(2)
+        ws(i) = 0.
+        do j = 1, napprox(2)
+          ws(i) = ws(i) + tmp_mat(i,j) * tmp_vec(j)
+        enddo
+      enddo
+      call dgemv('N', ntot, napprox(2), 
+     $           one,  approx(1,1), ntot,
+     $                 ws, 1, 
+     $           zero, approx(1,0), 1)
+
 c
       call axhelm  (wl,approx(1,0),h1,h2,1,1)
       call col2    (wl,vmk,ntot)
@@ -547,7 +574,8 @@ c
       return
       end
 c-----------------------------------------------------------------------
-      subroutine gensh(v1,h1,h2,vml,vmk,approx,napprox,wl,ws,name4)
+      subroutine gensh(v1,h1,h2,vml,vmk, 
+     $                 approx,h_approx,napprox,wl,ws,name4)
 c
 c     Reconstruct the solution to the original problem by adding back
 c     the previous solutions
@@ -564,7 +592,8 @@ c
       real v1(1),h1(1),h2(1),vml(1),vmk(1)
       real wl(1),ws(1)
       real approx(lt,0:1)
-      integer napprox(2)
+      integer napprox(3)
+      real h_approx(1)
       character*4 name4
 c
       n_max = napprox(1)
@@ -573,38 +602,20 @@ c
 c
 c     Reconstruct solution and save current du
 c
-      if (n_sav.lt.n_max) then
-c
-         if (niterhm.gt.0) then      ! new vector not in space
-            n_sav = n_sav+1
-            call copy(approx(1,n_sav),v1,ntot)
-            call add2(v1,approx(1,0),ntot)
-c           orthogonalize rhs against previous rhs and normalize
-            call hconj(approx,n_sav,h1,h2,vml,vmk,ws,name4,ierr)
+      call add2(v1,approx(1,0),ntot)
+      if (niterhm .lt. 1) return
+      napprox(2) = min(napprox(2) + 1, napprox(1))
+      napprox(3) = mod(napprox(3), napprox(1)) + 1
+      call copy(approx(1,napprox(3)), v1, ntot)
 
-c           if (ierr.ne.0) n_sav = n_sav-1
-            if (ierr.ne.0) n_sav = 0
-
-         else
-
-            call add2(v1,approx(1,0),ntot)
-
-         endif
-      else
-         n_sav = 1
-         call add2(v1,approx(1,0),ntot)
-         call copy(approx(1,n_sav),v1,ntot)
-c        normalize
-         call hconj(approx,n_sav,h1,h2,vml,vmk,ws,name4,ierr)
-         if (ierr.ne.0) n_sav = 0
-      endif
-
-      napprox(2)=n_sav
+      call hconj(approx,h_approx,napprox,napprox(3),
+     $           h1,h2,vml,vmk,ws,name4,ierr)
 
       return
       end
 c-----------------------------------------------------------------------
-      subroutine hconj(approx,k,h1,h2,vml,vmk,ws,name4,ierr)
+      subroutine hconj(approx,h_approx, napprox,
+     $                 k,h1,h2,vml,vmk,ws,name4,ierr)
 c
 c     Orthonormalize the kth vector against vector set
 c
@@ -616,75 +627,38 @@ c
       include 'TSTEP'
 c
       parameter  (lt=lx1*ly1*lz1*lelt)
+      integer napprox(3)
       real approx(lt,0:1),h1(1),h2(1),vml(1),vmk(1),ws(1)
+      real h_approx(napprox(1), napprox(1))
+      real one, zero
+      parameter (one = 1., zero = 0.)
       character*4 name4
 c
       ierr=0
       ntot=nx1*ny1*nz1*nelfld(ifield)
 c
+c     Compute H| approx(:,k) >
       call axhelm  (approx(1,0),approx(1,k),h1,h2,1,1)
       call col2    (approx(1,0),vmk,ntot)
-c
-c     Compute part of the norm   (Note:  a(0) already scaled by vml)
-c
-      alpha = glsc2(approx(1,0),approx(1,k),ntot)
-      alph1 = alpha
-c
-c     Gram-Schmidt
-c
-      km1=k-1
-      do i=1,km1
-         ws(i) = vlsc2(approx(1,0),approx(1,i),ntot)
+c MH: do we need this dsavg?
+      call dssum   (approx(1,0),nx1,ny1,nz1)
+      call col2    (approx(1,0),vml ,ntot)
+c     Compute <approx(:,i) | H | approx(:,k)>
+      call dgemv('T', lt, napprox(2), 
+     $           one,  approx(1,1), lt,
+     $                 approx(1,0),  1,
+     $           zero, h_approx(1,k), 1)
+       call gop(h_approx(1,k), ws, '+  ', napprox(1))
+
+c     Symmetry
+      do i = 1, napprox(1)
+        h_approx(k,i) = h_approx(i,k)
       enddo
-      if (km1.gt.0) call gop(ws,ws(k),'+  ',km1)
-c
-      do i=1,km1
-         alpham = -ws(i)
-         call add2s2(approx(1,k),approx(1,i),alpham,ntot)
-         alpha = alpha - ws(i)**2
-      enddo
-c
-c    .Normalize new element in approximation space
-c
-      eps = 1.e-7
-      if (wdsize.eq.8) eps = 1.e-15
-      ratio = alpha/alph1
-c
-      if (ratio.le.0) then
-         ierr=1
-         if (nio.eq.0) write(6,12) istep,name4,k,alpha,alph1
-   12    format(I6,1x,a4,' alpha b4 sqrt:',i4,1p2e12.4)
-      elseif (ratio.le.eps) then
-         ierr=2
-         if (nio.eq.0) write(6,12) istep,name4,k,alpha,alph1
-      else
-         ierr=0
-         alpha = 1.0/sqrt(alpha)
-         call cmult(approx(1,k),alpha,ntot)
-      endif
-c
-      if (ierr.ne.0) then
-         call axhelm  (approx(1,0),approx(1,k),h1,h2,1,1)
-         call col2    (approx(1,0),vmk,ntot)
-c
-c        Compute part of the norm   (Note:  a(0) already scaled by vml)
-c
-         alpha = glsc2(approx(1,0),approx(1,k),ntot)
-         if (nio.eq.0) write(6,12) istep,name4,k,alpha,alph1
-         if (alpha.le.0) then
-            ierr=3
-            if (nio.eq.0) write(6,12) istep,name4,k,alpha,alph1
-            return
-         endif
-         alpha = 1.0/sqrt(alpha)
-         call cmult(approx(1,k),alpha,ntot)
-         ierr = 0
-      endif
-c
+
       return
       end
 c-----------------------------------------------------------------------
-      subroutine updrhsh(approx,napprox,h1,h2,vml,vmk,ws,name4)
+      subroutine updrhsh(approx,h_approx,napprox,h1,h2,vml,vmk,ws,name4)
 c
 c     Reorthogonalize approx if dt has changed
 c
@@ -695,8 +669,9 @@ c
 c
 c
       parameter  (lt=lx1*ly1*lz1*lelt)
+      integer napprox(3)
       real approx(lt,0:1),h1(1),h2(1),vml(1),vmk(1),ws(1)
-      integer napprox(2)
+      real h_approx(1)
       character*4 name4
 c
       logical ifupdate
@@ -711,38 +686,34 @@ c
       real    dtold
       save    dtold
       data    dtold/0.0/
+
+      real hash
+      integer hash_int
+      equivalence (hash, hash_int)
+
 c
 c     First, we have to decide if the dt has changed.
 c
       ifupdate = .false.
-      if (dt.ne.dtold) then
-         dtold    = dt
-         name_old = name4
-         ifnewdt  = .true.
-         ifupdate = .true.
-      elseif (ifnewdt) then
-         if (name4.eq.name_old) then
-            ifnewdt = .false.
-         else
-            ifupdate = .true.
-         endif
+      hash = 0.
+      do i = 1, lt
+        hash = hash + h1(i)**(mod(i, 3) + 1)
+        hash = hash + h2(i)**(mod(i, 3) + 1)
+      enddo
+      if (hash_int /= napprox(4)) then
+        ifupdate = .true.
       endif
-      if (ifvarp(ifield)) ifupdate = .true.
-      if (iflomach)       ifupdate = .true.
+      napprox(4) = hash_int
 
       if (ifupdate) then    ! reorthogonalize 
          n_sav = napprox(2)
          l     = 1
          do k=1,n_sav
 c           Orthogonalize kth vector against {v_1,...,v_k-1}
-            if (k.ne.l) then
-               ntot = nx1*ny1*nz1*nelfld(ifield)
-               call copy(approx(1,l),approx(1,k),ntot)
-            endif
-            call hconj(approx,l,h1,h2,vml,vmk,ws,name4,ierr)
-            if (ierr.eq.0) l=l+1
+            napprox(2) = k
+            call hconj(approx,h_approx, napprox, k,
+     $                 h1,h2,vml,vmk,ws,name4,ierr)
          enddo
-         napprox(2)=min(l,n_sav)
       endif
 c
       return
@@ -798,7 +769,7 @@ c
       end
 c-----------------------------------------------------------------------
       subroutine hsolve(name,u,r,h1,h2,vmk,vml,imsh,tol,maxit,isd
-     $                 ,approx,napprox,bi)
+     $                 ,approx,h_approx,napprox,bi)
 c
 c     Either std. Helmholtz solve, or a projection + Helmholtz solve
 c
@@ -815,6 +786,7 @@ c
       REAL           vml  (LX1,LY1,LZ1,1)
       REAL           bi   (LX1,LY1,LZ1,1)
       REAL           approx (1)
+      REAL           h_approx(1)
       integer        napprox(1)
       common /ctmp2/ w1   (lx1,ly1,lz1,lelt)
       common /ctmp3/ w2   (2+2*mxprev)
@@ -845,19 +817,12 @@ c
 
          call col2   (r,vmk,n)
          call dssum  (r,nx1,ny1,nz1)
-
-         call blank (name6,6)
-         call chcopy(name6,name,4)
-         ifwt  = .true.
-         ifvec = .false.
-
-         call project1
-     $       (r,n,approx,napprox,h1,h2,vmk,vml,ifwt,ifvec,name6)
-
+         
+         call projh(r, h1, h2, bi, vml, vmk,
+     $              approx, h_approx, napprox, w1, w2, name)
          call hmhzpf (name,u,r,h1,h2,vmk,vml,imsh,tol,maxit,isd,bi)
-
-         call project2
-     $       (u,n,approx,napprox,h1,h2,vmk,vml,ifwt,ifvec,name6)
+         call gensh(u, h1, h2, vml, vmk, 
+     $              approx, h_approx, napprox, w1, w2, name)
 
       endif
 
