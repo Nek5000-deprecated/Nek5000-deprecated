@@ -22,14 +22,14 @@ c     note, this usage of CTMP1 will be less than elsewhere if NELT ~> 3.
       common /ctmp1/ tdump(lxyz,lpsc9)
       real*4         tdump
       real           tdmp(4)
-      equivalence   (tdump,tdmp)
+      equivalence   (tdump,tdmp) !these variables share the same memory
 
       real*4         test_pattern
 
       character*3    prefin,prefix
       character*1    fhdfle1(132)
       character*132   fhdfle
-      equivalence   (fhdfle,fhdfle1)
+      equivalence   (fhdfle,fhdfle1) ! share same memory so one is row and the other is column
       character*1    fldfile2(120)
       integer        fldfilei( 60)
       equivalence   (fldfilei,fldfile2)
@@ -215,15 +215,12 @@ c
          endif
 C        Map the pressure onto the velocity mesh
 C
-         ntott = nx1*ny1*nz1*nelt
          ntot1 = nx1*ny1*nz1*nelv
          nyz2  = ny2*nz2
          nxy1  = nx1*ny1
          nxyz  = nx1*ny1*nz1
          nxyz2 = nx2*ny2*nz2
 C
-         
-         call rzero(pm1,ntott)
          if (ifsplit) then
             call copy(pm1,pr,ntot1)
          elseif (if_full_pres) then
@@ -304,13 +301,15 @@ c     note, this usage of CTMP1 will be less than elsewhere if NELT ~> 3.
       data ndumps / 0 /
 
       logical ifxyo_s
-
+c  Write to logfile that you're outputting data
       if(nio.eq.0) then 
         WRITE(6,1001) istep,time
  1001   FORMAT(/,i9,1pe12.4,' Write checkpoint:')
       endif
       call nekgsync()      
 
+c  Check for file type
+c  If filetype =6 then use multi-file-output
       p66 = abs(param(66))
       if (p66.eq.6) then
          call mfo_outfld(prefix)
@@ -320,6 +319,7 @@ c     note, this usage of CTMP1 will be less than elsewhere if NELT ~> 3.
 
       ifxyo_s = ifxyo              ! Save ifxyo
 
+c  Check given prefix against the database of prefixes
       iprefix = i_find_prefix(prefix,99)
 
       ierr = 0
@@ -334,9 +334,11 @@ c       Open new file for each dump on /cfs
      $         nopen(iprefix) = mod1(nopen(iprefix),max_rst) ! restart
 
         call file2(nopen(iprefix),prefix)
+c     if file type is 0 or negative then open using statement for ASCII
         if (p66.lt.1.0) then
            open(unit=24,file=fldfle,form='formatted',status='unknown')
         else
+c     open binary file
            call  izero    (fldfilei,33)
            len = ltrunc   (fldfle,131)
            call chcopy    (fldfile2,fldfle,len)
@@ -345,11 +347,13 @@ c          write header as character string
            call blank(fhdfle,132)
         endif
       endif
+c    broadcast if you are dumping the grid
       call bcast(ifxyo,lsize)
+c    check to see if there was an error when byte_open was called
       if(p66.ge.1.0)
      $   call err_chk(ierr,'Error opening file in outfld. Abort. $')
 
-C     Figure out what goes in EXCODE
+C     Figure out what goes in EXCODE (header)
       CALL BLANK(EXCODE,30)
       NDUMPS=NDUMPS+1
       i=1
@@ -390,23 +394,23 @@ C     Figure out what goes in EXCODE
          enddo
       else
          !new header format
-         IF (IFXYO) THEN
+         IF (IFXYO) THEN !dumping grid information
             EXCODE(i)='X'
             i = i + 1
          ENDIF
-         IF (IFVO) THEN
+         IF (IFVO) THEN !dumping velocity information
             EXCODE(i)='U'
             i = i + 1
          ENDIF
-         IF (IFPO) THEN
+         IF (IFPO) THEN !dumping pressure information
             EXCODE(i)='P'
             i = i + 1
          ENDIF
-         IF (IFTO) THEN
+         IF (IFTO) THEN !dumping Temperature information
             EXCODE(i)='T'
             i = i + 1
          ENDIF
-         IF (LDIMT.GT.1) THEN
+         IF (LDIMT.GT.1) THEN !dumping passive scalar information
             NPSCALO = 0
             do k = 1,ldimt-1
               if(ifpsco(k)) NPSCALO = NPSCALO + 1
@@ -425,19 +429,25 @@ C     Dump header
       if (nid.eq.0) call dump_header(excode,p66,ierr)
       call err_chk(ierr,'Error dumping header in outfld. Abort. $')
 
+c   Get number of fields to write to file (xyzuvwpTt1 etc)
       call get_id(id)
 
+c  Number of points in each element
       nxyz  = nx1*ny1*nz1
 
       ierr = 0
-      do ieg=1,nelgt
 
-         jnid = gllnid(ieg)
-         ie   = gllel (ieg)
+c  Loop over each element
+      do ieg=1,nelgt !global number of elements
+
+         jnid = gllnid(ieg) !get processor id for element ieg
+         ie   = gllel (ieg) !get local id for element ieg
 
          if (nid.eq.0) then
+c           if the cell your looking for is in processor zero fill tdump
             if (jnid.eq.0) then
-               call fill_tmp(tdump,id,ie)
+               call fill_tmp(tdump,id,ie) !(storage array,return number of fields being written, element)
+c           else send request to the processor where it is located
             else
                mtype=2000+ieg
                len=4*id*nxyz
@@ -445,7 +455,10 @@ C     Dump header
                call csend (mtype,dum1,wdsize,jnid,nullpid)
                call crecv (mtype,tdump,len)
             endif
+c           if there were no problems write data to file            
             if(ierr.eq.0) call out_tmp(id,p66,ierr)
+c       processor containg data receive request from processor 0 
+c       and then send data to processor 0
          elseif (nid.eq.jnid) then
             call fill_tmp(tdump,id,ie)
             dum1=0.
@@ -1915,12 +1928,14 @@ c  8  format(i8,' prefix ',a3,5i5)
       end
 c-----------------------------------------------------------------------
       subroutine outpost(v1,v2,v3,vp,vt,name3)
-
+c   
+c Checks to see if passive scalar is to be output and calls outpost2
+c
       include 'SIZE'
       include 'INPUT'
 
-      real v1(1),v2(1),v3(1),vp(1),vt(1)
-      character*3 name3
+      real v1(1),v2(1),v3(1),vp(1),vt(1) ! pointers to the variables
+      character*3 name3 ! characters that will be attached to output file name
 
 
       itmp=0
@@ -1931,24 +1946,27 @@ c-----------------------------------------------------------------------
       end
 c-----------------------------------------------------------------------
       subroutine outpost2(v1,v2,v3,vp,vt,nfldt,name3)
-
+c
+c  
+c
       include 'SIZE'
       include 'SOLN'
       include 'INPUT'
 
-      parameter(ltot1=lx1*ly1*lz1*lelt)
-      parameter(ltot2=lx2*ly2*lz2*lelv)
+      parameter(ltot1=lx1*ly1*lz1*lelt) !size of vt field
+      parameter(ltot2=lx2*ly2*lz2*lelv) !size of pressure field 
       common /outtmp/  w1(ltot1),w2(ltot1),w3(ltot1),wp(ltot2)
-     &                ,wt(ltot1,ldimt)
+     &                ,wt(ltot1,ldimt) ! storage variables for the output process
 c
-      real v1(1),v2(1),v3(1),vp(1),vt(ltot1,1)
-      character*3 name3
-      logical if_save(ldimt)
+      real v1(1),v2(1),v3(1),vp(1),vt(ltot1,1) !pointers to variables
+      character*3 name3 ! character for file prefix
+      logical if_save(ldimt) ! subroutine variable for boolean flag ifpsco
 c
-      ntot1  = nx1*ny1*nz1*nelv
-      ntot1t = nx1*ny1*nz1*nelt
-      ntot2  = nx2*ny2*nz2*nelv
+      ntot1  = nx1*ny1*nz1*nelv !points in velocity field
+      ntot1t = nx1*ny1*nz1*nelt !points in temp/scalar field
+      ntot2  = nx2*ny2*nz2*nelv !points in pressure field
 
+c if there are more scalar fields requested then are supported in the problem 
       if(nfldt.gt.ldimt) then
         write(6,*) 'ABORT: outpost data too large (nfldt>ldimt)!'
         call exitt
@@ -1973,6 +1991,7 @@ c swap with data to dump
       enddo
 
 c dump data
+cc loop to identify how many passive scalars to print
       if_save(1) = ifto
       ifto = .false.
       if(nfldt.gt.0) ifto = .true. 
@@ -1982,6 +2001,8 @@ c dump data
          if(i+1.le.nfldt) ifpsco(i) = .true.
       enddo
 
+c routinte to dump the data all variables are stored in the 
+c in the current fields 
       call prepost(.true.,name3)
 
       ifto = if_save(1)
